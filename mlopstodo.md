@@ -1,8 +1,7 @@
-Sure thing! Here is that checklist formatted in Markdown. You can copy-paste this directly into a TODO.md file in your repo to track your progress.
-
-🚀 MLOps Sprint Checklist (1.5 Days)
+# 🚀 MLOps Sprint Checklist (1.5 Days)
 Phase 1: Foundations & Data (Day 1 Morning)
-[ ] Setup DVC (Data Version Control): Initialize DVC and connect it to a remote storage (S3, GCS, or Azure Blob). No more raw data in Git!
+
+[ X ] Setup DVC (Data Version Control): Initialize DVC and connect it to a remote storage (S3, GCS, or Azure Blob). No more raw data in Git!
 
 [ ] Data Validation Step: Add a script using Great Expectations or Deepchecks to catch "data bugs" before training starts.
 
