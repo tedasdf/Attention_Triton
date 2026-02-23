@@ -1,0 +1,6 @@
+- Build and scale training pipelines for large language models and other architectures
+- Triton
+- build out mutli attention variant with triton or pytorch 
+- CI/CD pipeline 
+- MLFlow or wandb for observfaibility into training and inference
+- optimise 
