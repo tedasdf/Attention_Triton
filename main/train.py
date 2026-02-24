@@ -14,6 +14,7 @@ from model.transformer import GPT
 from utils.data import get_titles, BPETokenizer, train_tokenizer
 from utils.logger import WandbLogger
 import mlflow
+import wandb
 
 
 def configure_logging(log_file: str):
@@ -212,6 +213,32 @@ def main(parser):
         with mlflow.start_run(run_name="production_candidate"):
             mlflow.log_param("total_epochs", 10)
             mlflow.pytorch.log_model(model, "ntp_model")
+
+    if not parser.smoke_test:
+        # Save current results
+        current_loss = val_loss
+
+        # Simple local check (Standard practice is to compare against a 'best_loss.txt')
+        best_loss_path = Path("best_loss.txt")
+        is_better = True
+
+        if best_loss_path.exists():
+            best_loss = float(best_loss_path.read_text())
+            if current_loss >= best_loss:
+                is_better = False
+                print(
+                    f"📉 Model (Loss: {current_loss:.4f}) did not beat Best (Loss: {best_loss:.4f}). Skipping S3 upload."
+                )
+
+        if is_better:
+            # Save the model
+            torch.save(model.state_dict(), "model.pt")
+
+            with open("run_metadata.env", "w") as f:
+                f.write(f"WANDB_RUN_NAME={wandb.run.name}\n")
+                f.write(f"MLFLOW_RUN_ID={mlflow.active_run().info.run_id}\n")
+                f.write(f"VAL_LOSS={current_loss:.4f}\n")
+
     wandb_logger.finish()
 
 
