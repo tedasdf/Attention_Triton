@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  update-and-run:
+  update:
     # This must match YOUR labels exactly
     runs-on: [self-hosted, Linux, x64, docker]
     

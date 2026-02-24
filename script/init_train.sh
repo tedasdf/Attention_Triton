@@ -41,14 +41,23 @@ echo "🚀 Step 3: Launching Training..."
 
 # 4. Execute with Environment Variables and Mounts
 # We use -e to pass the key you have in your local terminal session
+# docker run --rm --gpus all \
+#     -e WANDB_API_KEY="$WANDB_KEY" \
+#     -v "$(pwd):/" \
+#     -v "$STORAGE_PATH:/storage" \
+#     $IMAGE_NAME \
+#     python main/train.py \
+#     --data_dir /storage/datasets \
+#     --output_dir /storage/checkpoints
+
 docker run --rm --gpus all \
     -e WANDB_API_KEY="$WANDB_KEY" \
-    -v "$(pwd):/" \
-    -v "$STORAGE_PATH:/storage" \
-    $IMAGE_NAME \
-    python main/train.py \
-    --data_dir /storage/datasets \
-    --output_dir /storage/checkpoints
+    -e WANDB_DIR="/storage/wandb" \
+    -e MLFLOW_TRACKING_URI="file:///storage/mlruns" \
+    -v "$(pwd):/app" \
+    -v "/home/fypits25/ai_storage:/storage" \
+    ntp-train:latest \
+    python main/train.py --smoke-test
 
 # 5. Cleanup dangling images to save space on your 3090
 docker image prune -f
