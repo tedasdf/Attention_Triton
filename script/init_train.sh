@@ -3,41 +3,46 @@
 # Configuration
 IMAGE_NAME="ntp-train"
 DOCKERFILE_PATH=".devcontainer/Dockerfile"
+# Ensure the script knows where your storage is
+STORAGE_PATH="/home/$(whoami)/ai_storage"
 
 echo "🔍 Step 1: Checking Docker Environment..."
 
 # 1. Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Error: Docker is not running. Please start Docker Desktop."
+    echo "❌ Error: Docker is not running."
     exit 1
 fi
 
-# 2. Check if the image exists, if not, build it
-if [[ "$(docker images -q $IMAGE_NAME 2> /dev/null)" == "" ]]; then
-    echo "🏗️  Image '$IMAGE_NAME' not found. Building now..."
-    docker build -t $IMAGE_NAME -f $DOCKERFILE_PATH .
+# 2. Build the image (Removing the 'if exists' check)
+# It is better to run 'build' every time. If nothing changed, 
+# Docker's layer caching makes this take 0.5 seconds anyway.
+echo "🏗️  Ensuring image '$IMAGE_NAME' is up to date..."
+docker build -t $IMAGE_NAME -f $DOCKERFILE_PATH .
+
+echo "🧪 Step 2: Validating GPU & Integrity..."
+
+# Check GPU connectivity inside the container
+if docker run --rm --gpus all $IMAGE_NAME nvidia-smi > /dev/null 2>&1; then
+    echo "✅ GPU Passthrough OK."
 else
-    echo "✅ Image '$IMAGE_NAME' already exists."
+    echo "❌ Error: Docker cannot see your 3090. Check nvidia-container-toolkit."
+    exit 1
 fi
 
-echo "🧪 Step 2: Validating Container Integrity..."
+echo "🚀 Step 3: Launching Training..."
 
-# 3. Check if the container can run a simple import check
-# This ensures dependencies (torch, transformers) are actually installed
-if docker run --rm $IMAGE_NAME python -c "import torch; print(f'Torch {torch.__version__} OK')" > /dev/null 2>&1; then
-    echo "✅ Dependency check passed."
-else
-    echo "❌ Error: Container internal check failed. Rebuilding..."
-    docker build --no-cache -t $IMAGE_NAME -f $DOCKERFILE_PATH .
-fi
-
-echo "🚀 Step 3: Launching Smoke Test..."
-
-# 4. Execute the Smoke Test with Bind Mount
-# Using $(pwd) for compatibility with Bash-on-Windows
+# 4. Execute with Environment Variables and Mounts
+# We use -e to pass the key you have in your local terminal session
 docker run --rm --gpus all \
     -e WANDB_API_KEY=$WANDB_API_KEY \
     -v "$(pwd):/app" \
-    -v "/home/$(whoami)/ai_storage:/storage" \
+    -v "$STORAGE_PATH:/storage" \
     $IMAGE_NAME \
-    python main/train.py --data_path /storage/datasets --checkpoint_path /storage/checkpoints
+    python main/train.py \
+    --smoke-test \
+    --data-dir /storage/datasets \
+    --output-dir /storage/checkpoints
+
+# 5. Cleanup dangling images to save space on your 3090
+docker image prune -f
