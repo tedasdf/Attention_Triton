@@ -102,8 +102,8 @@ def iter_full_split(
 def main(parser):
     h = Hyperparameters()
 
-    data_dir = Path(parser.data_path)
-    output_dir = Path(parser.checkpoint_path)
+    data_dir = Path(parser.data_dir)
+    output_dir = Path(parser.output - dir)
     vocab_path = data_dir / "vocab.json"
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -284,13 +284,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
 
     parser.add_argument(
-        "--data_path",
+        "--data-dir",
         type=str,
         default="data",
         help="Path to datasets (symlinked or local)",
     )
     parser.add_argument(
-        "--checkpoint_path",
+        "--output-dir",
         type=str,
         default="checkpoints",
         help="Where to save model.pt and best_loss.txt",
