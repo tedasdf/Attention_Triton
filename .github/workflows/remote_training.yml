@@ -12,7 +12,7 @@ on:
 
 jobs:
   sync-and-train:
-    runs-on: [self-hosted, 3090]
+    runs-on: [self-hosted, x64, docker, Linux]
     
     steps:
       # 1. Pull latest code from GitHub

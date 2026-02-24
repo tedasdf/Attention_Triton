@@ -6,7 +6,7 @@ on:
 jobs:
   smoke-test:
     name: Build & Test Triton Kernels
-    runs-on: [self-hosted, 3090] # Targets your specific machine
+    runs-on: [self-hosted, x64, docker, Linux] # Targets your specific machine
     
     steps:
       - name: 🛰️ Checkout code

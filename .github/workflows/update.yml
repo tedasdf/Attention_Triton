@@ -7,7 +7,7 @@ on:
 jobs:
   update-and-run:
     # This must match YOUR labels exactly
-    runs-on: [self-hosted, linux, x64, docker]
+    runs-on: [self-hosted, Linux, x64, docker]
     
     steps:
       # 1. Pull the code. 
@@ -24,3 +24,11 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
+          git clean -fd
+        
+      - name: Link Heavy Storage
+        run: |
+          # Create symbolic links so the code sees 'data/' and 'checkpoints/'
+          # but the files actually live safely in ~/ai_storage
+          ln -sfn /home/fypits25/Documents/ted_backyard/ai_storage/datasets ./data
+          ln -sfn /home/fypits25/Documents/ted_backyard/ai_storage/checkpoints ./checkpoints

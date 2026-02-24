@@ -277,7 +277,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
 
     parser.add_argument(
-        "--data-path",
+        "--data_path",
         type=str,
         default="data",
         help="Path to datasets (symlinked or local)",
