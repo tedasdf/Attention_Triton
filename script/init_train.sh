@@ -3,8 +3,15 @@
 # Configuration
 IMAGE_NAME="ntp-train"
 DOCKERFILE_PATH=".devcontainer/Dockerfile"
-# Ensure the script knows where your storage is
 STORAGE_PATH="/home/$(whoami)/ai_storage"
+
+# --- NEW: Check for API Key ---
+# If a command line argument is provided, use it. Otherwise, use the env var.
+WANDB_KEY=${1:-$WANDB_API_KEY}
+
+if [ -z "$WANDB_KEY" ]; then
+    echo "⚠️ Warning: No WANDB_API_KEY provided. Training might fail or run offline."
+fi
 
 echo "🔍 Step 1: Checking Docker Environment..."
 
@@ -35,7 +42,7 @@ echo "🚀 Step 3: Launching Training..."
 # 4. Execute with Environment Variables and Mounts
 # We use -e to pass the key you have in your local terminal session
 docker run --rm --gpus all \
-    -e WANDB_API_KEY=$WANDB_API_KEY \
+    -e WANDB_API_KEY="$WANDB_KEY" \
     -v "$(pwd):/app" \
     -v "$STORAGE_PATH:/storage" \
     $IMAGE_NAME \

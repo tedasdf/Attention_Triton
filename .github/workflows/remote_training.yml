@@ -22,6 +22,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run Trainer via Docker Script
+        env:
+          # This maps the GitHub Secret to a shell environment variable
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
         run: |
           # 1. Make the script executable
           chmod +x init_train.sh
