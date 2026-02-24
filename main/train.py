@@ -102,7 +102,7 @@ def main(parser):
     h = Hyperparameters()
 
     data_dir = Path(parser.data_path)
-    output_dir = Path(parser.output_dir)
+    output_dir = Path(parser.checkpoint_path)
     vocab_path = data_dir / "vocab.json"
 
     output_dir.mkdir(parents=True, exist_ok=True)
