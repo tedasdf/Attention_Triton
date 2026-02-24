@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install "dvc[s3]"
 
 # Copy your source code
-COPY src/ ./src/
+COPY main/ ./main/
 
 # Smoke test command
 CMD ["python", "src/train.py", "--smoke-test"]

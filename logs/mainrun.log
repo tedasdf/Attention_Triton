@@ -1,0 +1,4 @@
+{"event": "hyperparameters_configured", "timestamp": 1771903744.0474076, "block_size": 128, "batch_size": 64, "vocab_size": 16000, "n_layer": 6, "n_head": 8, "d_model": 512, "dropout": 0.1, "lr": 0.006, "weight_decay": 0.0, "evals_per_epoch": 3, "epochs": 1, "seed": 1337, "num_titles": 100, "val_frac": 0.1, "log_file": "./logs/mainrun.log"}
+{"event": "device_info", "timestamp": 1771903744.0511703, "device": "cpu"}
+{"event": "dataset_info", "timestamp": 1771903751.2781959, "titles_count": 90, "epochs": 1, "batches_per_epoch": 0, "tokens_per_epoch": 923, "vocab_size": 1774}
+{"event": "model_info", "timestamp": 1771903751.7974439, "parameters_count": 27172864}
