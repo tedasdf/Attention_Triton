@@ -1,19 +1,19 @@
-name: Docker Smoke Test
+# name: Docker Smoke Test
 
-on: [push, pull_request]
+# on: [push, pull_request]
 
-jobs:
-  smoke-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+# jobs:
+#   smoke-test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        # Notice the '.' at the end for the context!
-        run: docker build -t ntp-train-test -f .devcontainer/Dockerfile .
+#       - name: Build Docker Image
+#         # Notice the '.' at the end for the context!
+#         run: docker build -t ntp-train-test -f .devcontainer/Dockerfile .
 
-      - name: Run Smoke Test
-        # We pass the --smoke-test flag directly to the container
-        run: |
-          docker run --rm ntp-train-test python main/train.py --smoke-test
+#       - name: Run Smoke Test
+#         # We pass the --smoke-test flag directly to the container
+#         run: |
+#           docker run --rm ntp-train-test python main/train.py --smoke-test

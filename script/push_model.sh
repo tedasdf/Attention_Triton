@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# 1. Run the training
-python main/train.py "$@"
-
 # 2. Check if the metadata file was created (only happens if it was a 'Better' model)
 if [ -f "run_metadata.env" ]; then
     echo "🏆 Better model detected. Syncing to S3..."

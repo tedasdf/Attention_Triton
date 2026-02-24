@@ -1,0 +1,26 @@
+name: Sync-up
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  update-and-run:
+    # This must match YOUR labels exactly
+    runs-on: [self-hosted, linux, x64, docker]
+    
+    steps:
+      # 1. Pull the code. 
+      # 'fetch-depth: 0' and 'clean: false' are better for large datasets 
+      # so it doesn't re-download everything every time.
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false
+
+      # 2. Force the local 3090 to match GitHub (solves the 'local changes' error)
+      - name: Reset to Remote
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
