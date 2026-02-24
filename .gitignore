@@ -1,5 +1,28 @@
-.cache
-
-__pycache__
-
+# --- Python Specifics ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.attn_venv/
 .env
+
+# --- Data & Models (Crucial for 3090/DVC) ---
+# We ignore the actual data files because DVC handles them
+data/
+checkpoints/
+*.pt
+*.pth
+*.bin
+
+# --- Logs & Visualization ---
+wandb/
+mlruns/
+mlflow.db
+*.log
+logs/
+
+# --- DVC Internal (DO NOT IGNORE EVERYTHING) ---
+# We want to keep the .dvc/config, but ignore the massive cache
+.dvc/cache
+.dvc/tmp
+.dvc/updater
