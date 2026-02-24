@@ -55,7 +55,7 @@ docker run --rm --gpus all \
     -e WANDB_DIR="/storage/wandb" \
     -e MLFLOW_TRACKING_URI="file:///storage/mlruns" \
     -v "$(pwd):/app" \
-    -v "/home/fypits25/ai_storage:/storage" \
+    -v "/home/fypits25/Documents/ted_backyard/ai_storage" \
     ntp-train:latest \
     python main/train.py --smoke-test
 
