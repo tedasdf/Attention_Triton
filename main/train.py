@@ -268,9 +268,13 @@ def main(parser):
 
         if is_better:
             print(f"🏆 New Best Model! Loss: {current_loss:.4f}")
-            model_save_path.parent.mkdir(parents=True, exist_ok=True)
+            if model_save_path.parent.exists() and not model_save_path.parent.is_dir():
+                print(
+                    f"⚠️ Warning: {model_save_path.parent} is a file. Deleting to create directory."
+                )
+                model_save_path.parent.unlink()  # Deletes the file
 
-            # 1. Save weights
+            model_save_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), model_save_path)
             # 2. Update best_loss record
             best_loss_path.write_text(f"{current_loss:.4f}")
