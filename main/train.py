@@ -106,6 +106,11 @@ def main(parser):
     output_dir = Path(parser.output_dir)
     vocab_path = data_dir / "vocab.json"
 
+    print("-" * 30)
+    print(f"📂 Data Dir: {data_dir.absolute()} | Exists: {data_dir.exists()}")
+    print(f"📂 Output Dir: {output_dir.absolute()} | Exists: {output_dir.exists()}")
+    print(f"📄 Vocab Path: {vocab_path} | Exists: {vocab_path.exists()}")
+    print("-" * 30)
     # output_dir.mkdir(parents=True, exist_ok=True)
 
     # Inside your main()
