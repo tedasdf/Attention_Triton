@@ -103,7 +103,7 @@ def main(parser):
     h = Hyperparameters()
 
     data_dir = Path(parser.data_dir)
-    output_dir = Path(parser.output - dir)
+    output_dir = Path(parser.output_dir)
     vocab_path = data_dir / "vocab.json"
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -284,13 +284,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
 
     parser.add_argument(
-        "--data-dir",
+        "--data_dir",
         type=str,
         default="data",
         help="Path to datasets (symlinked or local)",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output_dir",
         type=str,
         default="checkpoints",
         help="Where to save model.pt and best_loss.txt",
