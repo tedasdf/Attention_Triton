@@ -13,14 +13,14 @@ jobs:
     runs-on: [self-hosted, x64, docker, Linux]
     
     steps:
-      # 1. Pull latest code from GitHub
-      - name: Cleanup previous run permissions
-        run: sudo chown -R $USER:$USER .
+      # # 1. Pull latest code from GitHub
+      # - name: Cleanup previous run permissions
+      #   run: sudo chown -R $USER:$USER .
         
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      # - name: Checkout Code
+      #   uses: actions/checkout@v4
+      #   with:
+      #     fetch-depth: 0
 
       - name: Run Trainer via Docker Script
         env:
