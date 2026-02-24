@@ -1,6 +1,6 @@
-# name: Data Connection Test
+name: Data Connection Test
 
-# on: [push] # This runs every time you push code
+on: [push] # This runs every time you push code
 
 # jobs:
 #   test-s3-access:

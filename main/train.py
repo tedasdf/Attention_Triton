@@ -101,6 +101,12 @@ def iter_full_split(
 def main(parser):
     h = Hyperparameters()
 
+    data_dir = Path(parser.data_dir)
+    output_dir = Path(parser.output_dir)
+    vocab_path = data_dir / "vocab.json"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     # Inside your main()
     if parser.smoke_test:
         print("🚀 SMOKE TEST MODE: Running 1 epoch, 1 batch only.")
@@ -120,7 +126,20 @@ def main(parser):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.log("device_info", device=device)
 
-    train_titles, val_titles = get_titles(h.num_titles, h.seed, h.val_frac)
+    train_titles, val_titles = get_titles(
+        h.num_titles, h.seed, h.val_frac, data_dir=data_dir
+    )
+
+    # 2. Tokenizer: Don't retrain if not necessary
+    if vocab_path.exists():
+        logger.log("tokenizer_info", status="loading_existing", path=str(vocab_path))
+        tok = BPETokenizer.load(vocab_path)  # Assumes you have a .load() method
+    else:
+        logger.log("tokenizer_info", status="training_new")
+        vocab = train_tokenizer(
+            train_titles + val_titles, h.vocab_size, eos_token="<eos>"
+        )
+        tok = BPETokenizer(vocab)
 
     eos_token = "<eos>"
     tok = BPETokenizer(
@@ -215,28 +234,38 @@ def main(parser):
             mlflow.pytorch.log_model(model, "ntp_model")
 
     if not parser.smoke_test:
-        # Save current results
         current_loss = val_loss
+        best_loss_path = output_dir / "best_loss.txt"
+        model_save_path = output_dir / "model.pt"  # Standard name for DVC to track
+        metadata_path = Path(
+            "run_metadata.env"
+        )  # Keep in root for the shell script to find
 
-        # Simple local check (Standard practice is to compare against a 'best_loss.txt')
-        best_loss_path = Path("best_loss.txt")
         is_better = True
-
         if best_loss_path.exists():
-            best_loss = float(best_loss_path.read_text())
+            best_loss = float(best_loss_path.read_text().strip())
             if current_loss >= best_loss:
                 is_better = False
                 print(
-                    f"📉 Model (Loss: {current_loss:.4f}) did not beat Best (Loss: {best_loss:.4f}). Skipping S3 upload."
+                    f"📉 No improvement. Current: {current_loss:.4f} | Best: {best_loss:.4f}"
                 )
 
         if is_better:
-            # Save the model
-            torch.save(model.state_dict(), "model.pt")
+            print(f"🏆 New Best Model! Loss: {current_loss:.4f}")
+            # 1. Save weights
+            torch.save(model.state_dict(), model_save_path)
+            # 2. Update best_loss record
+            best_loss_path.write_text(f"{current_loss:.4f}")
 
-            with open("run_metadata.env", "w") as f:
-                f.write(f"WANDB_RUN_NAME={wandb.run.name}\n")
-                f.write(f"MLFLOW_RUN_ID={mlflow.active_run().info.run_id}\n")
+            # 3. Create metadata for the push_model.sh script
+            # Note: We write this to the ROOT so the shell script sees it easily
+            with open(metadata_path, "w") as f:
+                f.write(
+                    f"WANDB_RUN_NAME={wandb.run.name if wandb.run else 'offline'}\n"
+                )
+                f.write(
+                    f"MLFLOW_RUN_ID={mlflow.active_run().info.run_id if mlflow.active_run() else 'none'}\n"
+                )
                 f.write(f"VAL_LOSS={current_loss:.4f}\n")
 
     wandb_logger.finish()
@@ -246,6 +275,20 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
+
+    parser.add_argument(
+        "--data-path",
+        type=str,
+        default="data",
+        help="Path to datasets (symlinked or local)",
+    )
+    parser.add_argument(
+        "--checkpoint_path",
+        type=str,
+        default="checkpoints",
+        help="Where to save model.pt and best_loss.txt",
+    )
+
     parser.add_argument(
         "--smoke-test", action="store_true", help="Run a quick 1-batch validation"
     )

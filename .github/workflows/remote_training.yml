@@ -1,33 +1,32 @@
-# name: Remote Training & Deploy
+name: 3090 Remote Lab (Sync & Train)
 
-# on:
-#   push:
-#     branches: [ main ] # Trigger on push to main
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      experiment_name:
+        description: 'Name of the experiment (for checkpoint file)'
+        required: true
+        default: 'attention_test_v1'
 
-# jobs:
-#   train-and-push:
-#     runs-on: self-hosted # Runs on your Ubuntu GPU server
-#     steps:
-#       - name: Checkout Code
-#         uses: actions/checkout@v4
+jobs:
+  sync-and-train:
+    runs-on: [self-hosted, 3090]
+    
+    steps:
+      # 1. Pull latest code from GitHub
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-#       - name: Build and Train
-#         run: |
-#           ./init_train.sh # Runs the script we made earlier
-
-#       - name: DVC Push to S3
-#         if: success() # Only if training finishes
-#         env:
-#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         run: |
-#           # Only push if 'model.pt' was updated (the logic we added above)
-#           if [ -f "model.pt" ]; then
-#             dvc add model.pt
-#             dvc push
-#             git config --local user.email "action@github.com"
-#             git config --local user.name "GitHub Action"
-#             git add model.pt.dvc best_loss.txt
-#             git commit -m "chore: update champion model [skip ci]"
-#             git push
-#           fi
+      - name: Run Trainer via Docker Script
+        run: |
+          # 1. Make the script executable
+          chmod +x init_train.sh
+          
+          # 2. Run the script
+          # Note: We need to make sure the script uses the GPU.
+          # I recommend adding '--gpus all' to the docker run command in your .sh file
+          ./init_train.sh
