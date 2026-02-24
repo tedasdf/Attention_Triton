@@ -1,8 +1,6 @@
 name: 3090 Remote Lab (Sync & Train)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       experiment_name:
@@ -16,6 +14,9 @@ jobs:
     
     steps:
       # 1. Pull latest code from GitHub
+      - name: Cleanup previous run permissions
+        run: sudo chown -R $USER:$USER .
+        
       - name: Checkout Code
         uses: actions/checkout@v4
         with:

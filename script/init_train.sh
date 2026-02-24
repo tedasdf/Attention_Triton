@@ -42,6 +42,7 @@ echo "🚀 Step 3: Launching Training..."
 # 4. Execute with Environment Variables and Mounts
 # We use -e to pass the key you have in your local terminal session
 docker run --rm --gpus all \
+    --user "$(id -u):$(id -g)" \
     -e WANDB_API_KEY="$WANDB_KEY" \
     -v "$(pwd):/app" \
     -v "$STORAGE_PATH:/storage" \
