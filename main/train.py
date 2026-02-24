@@ -15,6 +15,7 @@ from utils.data import get_titles, BPETokenizer, train_tokenizer
 from utils.logger import WandbLogger
 import mlflow
 import wandb
+import os
 
 
 def configure_logging(log_file: str):
@@ -113,6 +114,12 @@ def main(parser):
         h.epochs = 1
         h.num_titles = 100
         batches = 1  # Force it to just one iteration
+        print("⚠️ WANDB_API_KEY not found in environment. WandB might fail.")
+    else:
+        # Use the environment variable if available
+        wandb_api_key = os.getenv("WANDB_API_KEY")
+        if wandb_api_key:
+            wandb.login(key=wandb_api_key)
 
     torch.manual_seed(h.seed)
     random.seed(h.seed)
