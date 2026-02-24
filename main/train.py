@@ -268,6 +268,8 @@ def main(parser):
 
         if is_better:
             print(f"🏆 New Best Model! Loss: {current_loss:.4f}")
+            model_save_path.parent.mkdir(parents=True, exist_ok=True)
+
             # 1. Save weights
             torch.save(model.state_dict(), model_save_path)
             # 2. Update best_loss record
