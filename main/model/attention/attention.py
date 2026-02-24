@@ -1,8 +1,9 @@
-
 from dataclasses import dataclass
-import torch, math
+import torch
+import math
 import torch.nn as nn
 from torch.nn import functional as F
+
 
 @dataclass
 class GPTConfig:
@@ -13,17 +14,20 @@ class GPTConfig:
     d_model: int
     dropout: float
 
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, cfg: GPTConfig):
         super().__init__()
         assert cfg.d_model % cfg.n_head == 0
         self.head_dim = cfg.d_model // cfg.n_head
-        self.n_head   = cfg.n_head
+        self.n_head = cfg.n_head
         self.qkv = nn.Linear(cfg.d_model, 3 * cfg.d_model)
         self.proj = nn.Linear(cfg.d_model, cfg.d_model)
         self.attn_drop = nn.Dropout(cfg.dropout)
-        self.resid_drop= nn.Dropout(cfg.dropout)
-        self.register_buffer("tril", torch.tril(torch.ones(cfg.block_size, cfg.block_size)))
+        self.resid_drop = nn.Dropout(cfg.dropout)
+        self.register_buffer(
+            "tril", torch.tril(torch.ones(cfg.block_size, cfg.block_size))
+        )
 
     def forward(self, x: torch.Tensor):
         B, T, C = x.size()
@@ -37,6 +41,7 @@ class CausalSelfAttention(nn.Module):
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         return self.resid_drop(self.proj(y))
 
+
 class MLP(nn.Module):
     def __init__(self, cfg: GPTConfig):
         super().__init__()
@@ -46,7 +51,10 @@ class MLP(nn.Module):
             nn.Linear(4 * cfg.d_model, cfg.d_model),
             nn.Dropout(cfg.dropout),
         )
-    def forward(self, x): return self.net(x)
+
+    def forward(self, x):
+        return self.net(x)
+
 
 class Block(nn.Module):
     def __init__(self, cfg: GPTConfig):
@@ -54,22 +62,24 @@ class Block(nn.Module):
         self.ln1 = nn.LayerNorm(cfg.d_model)
         self.ln2 = nn.LayerNorm(cfg.d_model)
         self.attn = CausalSelfAttention(cfg)
-        self.mlp  = MLP(cfg)
+        self.mlp = MLP(cfg)
+
     def forward(self, x):
         x = x + self.attn(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
+
 
 class GPT(nn.Module):
     def __init__(self, cfg: GPTConfig):
         super().__init__()
         self.cfg = cfg
         self.token_emb = nn.Embedding(cfg.vocab_size, cfg.d_model)
-        self.pos_emb   = nn.Parameter(torch.zeros(1, cfg.block_size, cfg.d_model))
-        self.drop      = nn.Dropout(cfg.dropout)
-        self.blocks    = nn.ModuleList([Block(cfg) for _ in range(cfg.n_layer)])
-        self.ln_f      = nn.LayerNorm(cfg.d_model)
-        self.head      = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
+        self.pos_emb = nn.Parameter(torch.zeros(1, cfg.block_size, cfg.d_model))
+        self.drop = nn.Dropout(cfg.dropout)
+        self.blocks = nn.ModuleList([Block(cfg) for _ in range(cfg.n_layer)])
+        self.ln_f = nn.LayerNorm(cfg.d_model)
+        self.head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
 
         self.apply(self._init_weights)
         self.head.weight = self.token_emb.weight
@@ -86,11 +96,14 @@ class GPT(nn.Module):
         tok = self.token_emb(idx)
         pos = self.pos_emb[:, :T, :]
         x = self.drop(tok + pos)
-        for block in self.blocks: x = block(x)
+        for block in self.blocks:
+            x = block(x)
         x = self.ln_f(x)
         logits = self.head(x)
         if targets is None:
             loss = None
         else:
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='mean')
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)), targets.view(-1), reduction="mean"
+            )
         return logits, loss

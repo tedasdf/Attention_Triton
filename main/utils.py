@@ -2,12 +2,11 @@ import os
 import sys
 from pathlib import Path
 
+
 def _check_devcontainer():
-    if not all([
-        Path("/root/.mainrun").exists()
-    ]):
-        os.system('cls' if os.name == 'nt' else 'clear')
-        
+    if not all([Path("/root/.mainrun").exists()]):
+        os.system("cls" if os.name == "nt" else "clear")
+
         print("""
 🚨 DEVCONTAINER REQUIRED 🚨
 
@@ -24,5 +23,6 @@ Setup Instructions:
 ☠️☠️  Running outside devcontainer = broken submission & metrics  ☠️☠️
         """)
         sys.exit(1)
+
 
 _check_devcontainer()
