@@ -101,7 +101,7 @@ def iter_full_split(
 def main(parser):
     h = Hyperparameters()
 
-    data_dir = Path(parser.data_dir)
+    data_dir = Path(parser.data_path)
     output_dir = Path(parser.output_dir)
     vocab_path = data_dir / "vocab.json"
 
