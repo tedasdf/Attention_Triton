@@ -40,9 +40,8 @@ docker run --rm --gpus all \
     -v "$STORAGE_PATH:/storage" \
     $IMAGE_NAME \
     python main/train.py \
-    --smoke-test \
-    --data-dir /storage/datasets \
-    --output-dir /storage/checkpoints
+    --data_dir /storage/datasets \
+    --output_dir /storage/checkpoints
 
 # 5. Cleanup dangling images to save space on your 3090
 docker image prune -f
