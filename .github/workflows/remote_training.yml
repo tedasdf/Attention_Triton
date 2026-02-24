@@ -24,14 +24,14 @@ jobs:
 
       - name: Run Trainer via Docker Script
         env:
-          # This maps the GitHub Secret to a shell environment variable
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          EXP_NAME: ${{ github.event.inputs.experiment_name }}
         run: |
+          # 1. Move to the project root
           cd /home/fypits25/Documents/ted_backyard/actions-runner/_work/Attention_Triton/Attention_Triton
-          # 1. Make the script executable
+          
+          # 2. Make the script executable (using the correct path)
           chmod +x ./script/init_train.sh
           
-          # 2. Run the script
-          # Note: We need to make sure the script uses the GPU.
-          # I recommend adding '--gpus all' to the docker run command in your .sh file
-          ./script/init_train.sh
+          # 3. Run it, passing the secret and the experiment name
+          ./script/init_train.sh "$WANDB_API_KEY" "$EXP_NAME"
