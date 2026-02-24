@@ -1,33 +1,33 @@
-name: Remote Training & Deploy
+# name: Remote Training & Deploy
 
-on:
-  push:
-    branches: [ main ] # Trigger on push to main
+# on:
+#   push:
+#     branches: [ main ] # Trigger on push to main
 
-jobs:
-  train-and-push:
-    runs-on: self-hosted # Runs on your Ubuntu GPU server
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+# jobs:
+#   train-and-push:
+#     runs-on: self-hosted # Runs on your Ubuntu GPU server
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
 
-      - name: Build and Train
-        run: |
-          ./init_train.sh # Runs the script we made earlier
+#       - name: Build and Train
+#         run: |
+#           ./init_train.sh # Runs the script we made earlier
 
-      - name: DVC Push to S3
-        if: success() # Only if training finishes
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          # Only push if 'model.pt' was updated (the logic we added above)
-          if [ -f "model.pt" ]; then
-            dvc add model.pt
-            dvc push
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add model.pt.dvc best_loss.txt
-            git commit -m "chore: update champion model [skip ci]"
-            git push
-          fi
+#       - name: DVC Push to S3
+#         if: success() # Only if training finishes
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         run: |
+#           # Only push if 'model.pt' was updated (the logic we added above)
+#           if [ -f "model.pt" ]; then
+#             dvc add model.pt
+#             dvc push
+#             git config --local user.email "action@github.com"
+#             git config --local user.name "GitHub Action"
+#             git add model.pt.dvc best_loss.txt
+#             git commit -m "chore: update champion model [skip ci]"
+#             git push
+#           fi
