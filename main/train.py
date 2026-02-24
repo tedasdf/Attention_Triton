@@ -106,7 +106,7 @@ def main(parser):
     output_dir = Path(parser.output_dir)
     vocab_path = data_dir / "vocab.json"
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # output_dir.mkdir(parents=True, exist_ok=True)
 
     # Inside your main()
     if parser.smoke_test:
