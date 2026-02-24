@@ -36,7 +36,8 @@ echo "🚀 Step 3: Launching Smoke Test..."
 # 4. Execute the Smoke Test with Bind Mount
 # Using $(pwd) for compatibility with Bash-on-Windows
 docker run --rm --gpus all \
+    -e WANDB_API_KEY=$WANDB_API_KEY \
     -v "$(pwd):/app" \
     -v "/home/$(whoami)/ai_storage:/storage" \
     $IMAGE_NAME \
-    python main/train.py --smoke-test --data_path /storage/datasets --checkpoint_path /storage/checkpoints
+    python main/train.py --data_path /storage/datasets --checkpoint_path /storage/checkpoints
