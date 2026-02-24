@@ -57,7 +57,7 @@ docker run --rm --gpus all \
     -v "$(pwd):/app" \
     -v "/home/fypits25/Documents/ted_backyard/ai_storage" \
     ntp-train:latest \
-    python main/train.py --smoke-test
+    python main/train.py
 
 # 5. Cleanup dangling images to save space on your 3090
 docker image prune -f

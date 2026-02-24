@@ -139,7 +139,11 @@ def main(parser):
     logger.log("device_info", device=device)
 
     train_titles, val_titles = get_titles(
-        h.num_titles, h.seed, h.val_frac, data_dir=data_dir
+        h.num_titles,
+        h.seed,
+        h.val_frac,
+        smoke_test=parser.smoke_test,
+        data_dir=data_dir,
     )
 
     # 2. Tokenizer: Don't retrain if not necessary
