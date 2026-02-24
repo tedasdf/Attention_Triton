@@ -6,18 +6,23 @@ from tokenizers import models, trainers, pre_tokenizers, decoders
 
 
 def get_titles(
-    num_titles: int, seed: int, val_frac: float, data_dir: str = "data"
+    num_titles: int,
+    seed: int,
+    val_frac: float,
+    smoke_test: bool,
+    data_dir: str = "data",
 ) -> tuple[list[str], list[str]]:
     # Use your persistent storage for the HuggingFace cache
     # This ensures that if you run this again, it's even faster!
     hf_cache_dir = Path(data_dir) / "hf_cache"
     hf_cache_dir.mkdir(parents=True, exist_ok=True)
 
+    streaming = not smoke_test
     # 1. Use streaming=True and point to our external storage
     ds = load_dataset(
         "julien040/hacker-news-posts",
         split="train",
-        streaming=True,
+        streaming=streaming,
         cache_dir=str(hf_cache_dir),  # <--- Crucial for your 3090 setup
     )
 
