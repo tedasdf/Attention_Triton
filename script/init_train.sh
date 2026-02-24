@@ -43,7 +43,7 @@ echo "🚀 Step 3: Launching Training..."
 # We use -e to pass the key you have in your local terminal session
 docker run --rm --gpus all \
     -e WANDB_API_KEY="$WANDB_KEY" \
-    -v "$(pwd):/app" \
+    -v "$(pwd):/" \
     -v "$STORAGE_PATH:/storage" \
     $IMAGE_NAME \
     python main/train.py \
