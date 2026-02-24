@@ -1,0 +1,1 @@
+docker build -t ntp-train -f .devcontainer/Dockerfile .
