@@ -1,19 +1,25 @@
-# name: Docker Smoke Test
+name: 🚀 Docker GPU Smoke Test
 
-# on: [push, pull_request]
+on:
+  workflow_dispatch: # This adds the "Run workflow" button in GitHub UI
 
-# jobs:
-#   smoke-test:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+jobs:
+  smoke-test:
+    name: Build & Test Triton Kernels
+    runs-on: [self-hosted, 3090] # Targets your specific machine
+    
+    steps:
+      - name: 🛰️ Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Build Docker Image
-#         # Notice the '.' at the end for the context!
-#         run: docker build -t ntp-train-test -f .devcontainer/Dockerfile .
+      - name: 🛠️ Build Docker Image
+        run: |
+          # Using a tag based on the commit helps avoid cache conflicts
+          docker build -t ntp-train-test:${{ github.sha }} -f .devcontainer/Dockerfile .
 
-#       - name: Run Smoke Test
-#         # We pass the --smoke-test flag directly to the container
-#         run: |
-#           docker run --rm ntp-train-test python main/train.py --smoke-test
+      - name: 🏎️ Run Smoke Test (with GPU)
+        run: |
+          # --gpus all: Essential for Triton/Attention math on the 3090
+          # --rm: Automatically clean up the container after it finishes
+          docker run --rm --gpus all ntp-train-test:${{ github.sha }} \
+            python main/train.py --smoke-test
