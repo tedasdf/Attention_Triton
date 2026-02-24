@@ -273,7 +273,8 @@ def main(parser):
                     f"⚠️ Warning: {model_save_path.parent} is a file. Deleting to create directory."
                 )
                 model_save_path.parent.unlink()  # Deletes the file
-
+            else:
+                print(f"This {model_save_path}")
             model_save_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), model_save_path)
             # 2. Update best_loss record
