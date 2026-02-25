@@ -55,9 +55,11 @@ docker run --rm --gpus all \
     -e WANDB_DIR="/storage/wandb" \
     -e MLFLOW_TRACKING_URI="file:///storage/mlruns" \
     -v "$(pwd):/app" \
-    -v "/home/fypits25/Documents/ted_backyard/ai_storage" \
+    -v "/home/fypits25/Documents/ted_backyard/ai_storage:/storage" \
     ntp-train:latest \
-    python main/train.py
+    python main/train.py \ 
+    --data_dir /storage/datasets \
+    --output_dir /storage/checkpoints
 
 # 5. Cleanup dangling images to save space on your 3090
 docker image prune -f

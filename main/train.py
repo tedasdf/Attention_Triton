@@ -100,9 +100,6 @@ def iter_full_split(
 
 
 def main(parser):
-    logging_path = "/home/fypits25/Documents/ted_backyard/ai_storage"
-    Path(logging_path).mkdir(parents=True, exist_ok=True)
-
     h = Hyperparameters()
 
     data_dir = Path(parser.data_dir)
@@ -247,7 +244,7 @@ def main(parser):
                 )
 
     if not parser.smoke_test:
-        mlflow.set_tracking_uri(f"file://{logging_path}")
+        mlflow.set_tracking_uri("file:///storage/mlruns")
         with mlflow.start_run(run_name="production_candidate"):
             mlflow.log_param("total_epochs", 10)
             mlflow.pytorch.log_model(model, "ntp_model")
