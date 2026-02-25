@@ -14,7 +14,7 @@ class Hyperparameters:
     lr: float = 6e-3
     weight_decay: float = 0.0
     evals_per_epoch: int = 3
-
+    attn_type: str = "standard"
     epochs: int = 7
     seed: int = 1337
     num_titles: int = 100_000
