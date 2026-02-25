@@ -4,7 +4,6 @@ block_size: 128
 d_model: 512
 n_layer: 6
 n_head: 8
-n_kv_heads: 8  # Default MHA (n_kv_heads = n_head)
 dropout: 0.1
 vocab_size: 16000
 attn_type: "standard"
