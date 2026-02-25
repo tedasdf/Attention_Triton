@@ -17,6 +17,8 @@ import mlflow
 import wandb
 import os
 
+from omegaconf import OmegaConf
+
 
 def configure_logging(log_file: str):
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
@@ -100,7 +102,10 @@ def iter_full_split(
 
 
 def main(parser):
-    h = Hyperparameters()
+    # 1. Create a config object from the dataclass
+    schema = OmegaConf.structured(Hyperparameters)
+    loaded_cfg = OmegaConf.load("config.yaml")
+    cfg = OmegaConf.merge(schema, loaded_cfg)
 
     data_dir = Path(parser.data_dir)
     output_dir = Path(parser.output_dir)
@@ -116,8 +121,8 @@ def main(parser):
     # Inside your main()
     if parser.smoke_test:
         print("🚀 SMOKE TEST MODE: Running 1 epoch, 1 batch only.")
-        h.epochs = 1
-        h.num_titles = 100
+        cfg.epochs = 1
+        cfg.num_titles = 100
         batches = 1  # Force it to just one iteration
         print("⚠️ WANDB_API_KEY not found in environment. WandB might fail.")
     else:
@@ -126,22 +131,22 @@ def main(parser):
         if wandb_api_key:
             wandb.login(key=wandb_api_key)
 
-    torch.manual_seed(h.seed)
-    random.seed(h.seed)
+    torch.manual_seed(cfg.seed)
+    random.seed(cfg.seed)
 
     global logger
-    logger = configure_logging(h.log_file)
+    logger = configure_logging(cfg.log_file)
 
-    hyperparams_dict = vars(h)
+    hyperparams_dict = vars(cfg)
     logger.log("hyperparameters_configured", **hyperparams_dict)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.log("device_info", device=device)
 
     train_titles, val_titles = get_titles(
-        h.num_titles,
-        h.seed,
-        h.val_frac,
+        cfg.num_titles,
+        cfg.seed,
+        cfg.val_frac,
         smoke_test=parser.smoke_test,
         data_dir=data_dir,
     )
@@ -153,44 +158,46 @@ def main(parser):
     else:
         logger.log("tokenizer_info", status="training_new")
         vocab = train_tokenizer(
-            train_titles + val_titles, h.vocab_size, eos_token="<eos>"
+            train_titles + val_titles, cfg.vocab_size, eos_token="<eos>"
         )
         tok = BPETokenizer(vocab)
 
     eos_token = "<eos>"
     tok = BPETokenizer(
-        train_tokenizer(train_titles + val_titles, h.vocab_size, eos_token=eos_token)
+        train_tokenizer(train_titles + val_titles, cfg.vocab_size, eos_token=eos_token)
     )
     train_text = eos_token.join(train_titles) + eos_token
     val_text = eos_token.join(val_titles) + eos_token
     train_ids = torch.tensor(tok.encode(train_text), dtype=torch.long)
     val_ids = torch.tensor(tok.encode(val_text), dtype=torch.long)
 
-    batches = len(train_ids) // (h.block_size * h.batch_size)
-    max_steps = h.epochs * batches
-    eval_interval = batches // h.evals_per_epoch
+    batches = len(train_ids) // (cfg.block_size * cfg.batch_size)
+    max_steps = cfg.epochs * batches
+    eval_interval = batches // cfg.evals_per_epoch
     logger.log(
         "dataset_info",
         titles_count=len(train_titles),
-        epochs=h.epochs,
+        epochs=cfg.epochs,
         batches_per_epoch=batches,
         tokens_per_epoch=len(train_ids),
         vocab_size=tok.vocab_size,
     )
 
-    model_cfg = GPTConfig.from_flat(h)
+    model_cfg = GPTConfig.from_flat(cfg)
     model = GPT(model_cfg).to(device)
     model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.log("model_info", parameters_count=model_params)
 
-    opt = torch.optim.SGD(model.parameters(), lr=h.lr, weight_decay=h.weight_decay)
+    opt = torch.optim.SGD(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
     def evaluate():
         model.eval()
         losses = 0.0
         with torch.no_grad():
-            for xb, yb in iter_full_split(val_ids, h.block_size, h.batch_size, device):
+            for xb, yb in iter_full_split(
+                val_ids, cfg.block_size, cfg.batch_size, device
+            ):
                 logits, _ = model(xb, yb)
                 B, T, V = logits.size()
                 loss = F.cross_entropy(logits.view(-1, V), yb.view(-1), reduction="sum")
@@ -199,16 +206,18 @@ def main(parser):
         return losses / len(val_text)
 
     wandb_logger = WandbLogger(
-        project="ntp-transformer", config=h, enabled=not parser.smoke_test
+        project="ntp-transformer", config=cfg, enabled=not parser.smoke_test
     )
 
     ptr = 0
     step = 0
     t0 = time.time()
-    for epoch in range(1, h.epochs + 1):
-        for _ in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{h.epochs}"):
+    for epoch in range(1, cfg.epochs + 1):
+        for _ in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
             step += 1
-            xb, yb, ptr = get_batch(train_ids, ptr, h.block_size, h.batch_size, device)
+            xb, yb, ptr = get_batch(
+                train_ids, ptr, cfg.block_size, cfg.batch_size, device
+            )
             _, loss = model(xb, yb)
             opt.zero_grad(set_to_none=True)
             loss.backward()

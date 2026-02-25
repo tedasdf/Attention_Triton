@@ -1,17 +1,18 @@
-# main/config/base.yaml
-model:
-block_size: 128
-d_model: 512
-n_layer: 6
-n_head: 8
-dropout: 0.1
-vocab_size: 16000
-attn_type: "standard"
-batch_size: 128
-lr: 0.006
-weight_decay: 0.0
-evals_per_epoch: int = 3
-epochs: 7
-seed: 1337
-num_titles: 100000
-val_frac: 0.1
+# config.yaml
+hyperparameters:
+  block_size: 128
+  batch_size: 128
+  vocab_size: 16000
+  n_layer: 6
+  n_head: 16
+  d_model: 512
+  dropout: 0.1
+  lr: 0.006          # Scientific notation (6e-3) is also supported
+  weight_decay: 0.0
+  evals_per_epoch: 3
+  attn_type: "standard"
+  epochs: 7
+  seed: 1337
+  num_titles: 100000
+  val_frac: 0.10
+  log_file: "./logs/mainrun.log"
