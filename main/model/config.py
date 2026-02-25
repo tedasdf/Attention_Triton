@@ -51,10 +51,11 @@ class GPTConfig:
     # Factory method to create from a flat dict (like your Hyperparameters)
     @classmethod
     def from_flat(cls, h: Hyperparameters):
-        attn_cfg = AttentionConfig(h.d_model, h.n_head, h.block_size, h.dropout)
+        attn_cfg = AttentionConfig(
+            h.attn_type, h.d_model, h.n_head, h.block_size, h.dropout
+        )
         mlp_cfg = MLPConfig(h.d_model, h.dropout)
         return cls(
-            h.attn_type,
             h.vocab_size,
             h.n_layer,
             h.d_model,
