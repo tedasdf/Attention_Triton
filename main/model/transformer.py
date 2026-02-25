@@ -11,7 +11,7 @@ class Block(nn.Module):
     def __init__(self, attn_cfg: AttentionConfig, mlp_cfg: MLPConfig):
         super().__init__()
         self.ln1 = nn.LayerNorm(attn_cfg.d_model)
-        self.attn = get_attention(attn_cfg.attn_type, config=attn_cfg)
+        self.attn = get_attention(attn_cfg.attn_type, cfg=attn_cfg)
         self.ln2 = nn.LayerNorm(mlp_cfg.d_model)
         self.mlp = MLP(mlp_cfg)
 
