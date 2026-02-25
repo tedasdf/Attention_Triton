@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import Union
 
 
 @dataclass
 class Hyperparameters:
     block_size: int = 128
-    batch_size: int = 128
+    batch_size: int = 64
     vocab_size: int = 16_000
     n_layer: int = 6
     n_head: int = 8
@@ -14,7 +13,7 @@ class Hyperparameters:
     lr: float = 6e-3
     weight_decay: float = 0.0
     evals_per_epoch: int = 3
-    attn_type: str = "standard"
+
     epochs: int = 7
     seed: int = 1337
     num_titles: int = 100_000
@@ -24,23 +23,16 @@ class Hyperparameters:
 
 @dataclass
 class AttentionConfig:
-    attn_type: str = "standard"
-    d_model: int = 512
-    n_head: int = 8
-    block_size: int = 128
-    dropout: float = 0.1
-
-
-@dataclass
-class GQAConfig(AttentionConfig):
-    attn_type: str = "gqa"
-    n_kv_heads: int = 2  # Branching specific field
+    d_model: int
+    n_head: int
+    block_size: int
+    dropout: float
 
 
 @dataclass
 class MLPConfig:
-    d_model: int = 512
-    dropout: float = 0.1
+    d_model: int
+    dropout: float
     expansion_factor: int = 4
 
 
@@ -50,37 +42,22 @@ class GPTConfig:
     n_layer: int
     d_model: int
     block_size: int
-    dropout: float
-    # attn can be either standard AttentionConfig or the branched GQAConfig
-    attn: Union[AttentionConfig, GQAConfig]
+    dropout: int
+    # Nested configs
+    attn: AttentionConfig
     mlp: MLPConfig
 
+    # Factory method to create from a flat dict (like your Hyperparameters)
     @classmethod
     def from_flat(cls, h: Hyperparameters):
-        # The Branching Logic
-        if h.attn_type == "gqa":
-            attn_cfg = GQAConfig(
-                d_model=h.d_model,
-                n_head=h.n_head,
-                n_kv_heads=h.n_kv_heads,
-                block_size=h.block_size,
-                dropout=h.dropout,
-            )
-        else:
-            attn_cfg = AttentionConfig(
-                attn_type="standard",
-                d_model=h.d_model,
-                n_head=h.n_head,
-                block_size=h.block_size,
-                dropout=h.dropout,
-            )
-
+        attn_cfg = AttentionConfig(h.d_model, h.n_head, h.block_size, h.dropout)
+        mlp_cfg = MLPConfig(h.d_model, h.dropout)
         return cls(
-            vocab_size=h.vocab_size,
-            n_layer=h.n_layer,
-            d_model=h.d_model,
-            block_size=h.block_size,
-            dropout=h.dropout,
-            attn=attn_cfg,
-            mlp=MLPConfig(h.d_model, h.dropout),
+            h.vocab_size,
+            h.n_layer,
+            h.d_model,
+            h.block_size,
+            h.dropout,
+            attn_cfg,
+            mlp_cfg,
         )
