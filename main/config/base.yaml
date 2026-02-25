@@ -1,23 +1,18 @@
 # main/config/base.yaml
 model:
-  block_size: 128
-  d_model: 512
-  n_layer: 6
-  n_head: 8
-  n_kv_heads: 8  # Default MHA (n_kv_heads = n_head)
-  dropout: 0.1
-  vocab_size: 16000
-  attn_type: "standard"
-
-train:
-  batch_size: 128
-  lr: 0.006
-  weight_decay: 0.0
-  epochs: 7
-  seed: 1337
-
-data:
-  num_titles: 100000
-  val_frac: 0.1
-  data_dir: "/storage/datasets"
-  output_dir: "/storage/checkpoints"
+block_size: 128
+d_model: 512
+n_layer: 6
+n_head: 8
+n_kv_heads: 8  # Default MHA (n_kv_heads = n_head)
+dropout: 0.1
+vocab_size: 16000
+attn_type: "standard"
+batch_size: 128
+lr: 0.006
+weight_decay: 0.0
+evals_per_epoch: int = 3
+epochs: 7
+seed: 1337
+num_titles: 100000
+val_frac: 0.1
