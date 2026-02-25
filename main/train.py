@@ -104,7 +104,7 @@ def iter_full_split(
 def main(parser):
     # 1. Create a config object from the dataclass
     schema = OmegaConf.structured(Hyperparameters)
-    loaded_cfg = OmegaConf.load("config.yaml")
+    loaded_cfg = OmegaConf.load("config/base.yaml")
     cfg = OmegaConf.merge(schema, loaded_cfg)
 
     data_dir = Path(parser.data_dir)
