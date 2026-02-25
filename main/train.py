@@ -16,7 +16,6 @@ from utils.logger import WandbLogger
 import mlflow
 import wandb
 import os
-from omegaconf import OmegaConf
 
 
 def configure_logging(log_file: str):
@@ -101,10 +100,7 @@ def iter_full_split(
 
 
 def main(parser):
-    base_conf = OmegaConf.structured(Hyperparameters)
-    yaml_conf = OmegaConf.load("config/base.yaml")
-
-    h = OmegaConf.merge(base_conf, yaml_conf, OmegaConf.from_cli())
+    h = Hyperparameters()
 
     data_dir = Path(parser.data_dir)
     output_dir = Path(parser.output_dir)
@@ -250,16 +246,8 @@ def main(parser):
     if not parser.smoke_test:
         mlflow.set_tracking_uri("file:///storage/mlruns")
         with mlflow.start_run(run_name="production_candidate"):
-            mlflow.log_params(OmegaConf.to_container(h, resolve=True))
-            mlflow.log_param("total_epochs", 7)
-            mlflow.pytorch.log_model(
-                pytorch_model=model,
-                artifact_path="ntp_model",
-                extra_files=["config/base.yaml"],
-                # (Optional) Log an example input so MLflow knows the tensor shapes
-                input_example=xb[:1].cpu().numpy(),
-            )
-            mlflow.log_metric("final_val_loss", val_loss)
+            mlflow.log_param("total_epochs", 10)
+            mlflow.pytorch.log_model(model, "ntp_model")
 
     if not parser.smoke_test:
         current_loss = val_loss
