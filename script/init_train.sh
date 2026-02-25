@@ -57,7 +57,7 @@ docker run --rm --gpus all \
     -v "$(pwd):/app" \
     -v "/home/fypits25/Documents/ted_backyard/ai_storage:/storage" \
     ntp-train:latest \
-    python main/train.py \ 
+    python main/train.py \
     --data_dir /storage/datasets \
     --output_dir /storage/checkpoints
 
