@@ -1,8 +1,10 @@
 # model/attention/__init__.py
 from .standard import CausalSelfAttention
+from .GQA import GroupQueryAttn
 
 ATTENTION_REGISTRY = {
     "standard": CausalSelfAttention,
+    "gpa": GroupQueryAttn,
     # "flash": FlashAttention,
     # "sliding": SlidingAttention
 }

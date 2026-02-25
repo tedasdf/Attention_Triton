@@ -1,17 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dataclasses import dataclass
 from .standard import CausalSelfAttention
-
-
-@dataclass
-class GQAConfig:
-    n_kv_head: int
+from model.config import GQAConfig
 
 
 class GroupQueryAttn(CausalSelfAttention):
-    def __init__(self, cfg):
+    def __init__(self, cfg: GQAConfig):
         super().__init__(cfg)
         if hasattr(self, "kv"):
             del self.kv
@@ -45,7 +40,3 @@ class GroupQueryAttn(CausalSelfAttention):
         y = y.transpose(1, 2).contiguous().view(B, T, C)
 
         return self.out_proj(y)
-
-
-if __name__ == "__main__":
-    raise ValueError

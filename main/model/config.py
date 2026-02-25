@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Union
 
 
 @dataclass
@@ -24,16 +25,22 @@ class Hyperparameters:
 @dataclass
 class AttentionConfig:
     attn_type: str = "standard"
-    d_model: int
-    n_head: int
-    block_size: int
-    dropout: float
+    d_model: int = 512
+    n_head: int = 8
+    block_size: int = 128
+    dropout: float = 0.1
+
+
+@dataclass
+class GQAConfig(AttentionConfig):
+    attn_type: str = "gqa"
+    n_kv_heads: int = 2  # Branching specific field
 
 
 @dataclass
 class MLPConfig:
-    d_model: int
-    dropout: float
+    d_model: int = 512
+    dropout: float = 0.1
     expansion_factor: int = 4
 
 
@@ -43,22 +50,37 @@ class GPTConfig:
     n_layer: int
     d_model: int
     block_size: int
-    dropout: int
-    # Nested configs
-    attn: AttentionConfig
+    dropout: float
+    # attn can be either standard AttentionConfig or the branched GQAConfig
+    attn: Union[AttentionConfig, GQAConfig]
     mlp: MLPConfig
 
-    # Factory method to create from a flat dict (like your Hyperparameters)
     @classmethod
     def from_flat(cls, h: Hyperparameters):
-        attn_cfg = AttentionConfig(h.d_model, h.n_head, h.block_size, h.dropout)
-        mlp_cfg = MLPConfig(h.d_model, h.dropout)
+        # The Branching Logic
+        if h.attn_type == "gqa":
+            attn_cfg = GQAConfig(
+                d_model=h.d_model,
+                n_head=h.n_head,
+                n_kv_heads=h.n_kv_heads,
+                block_size=h.block_size,
+                dropout=h.dropout,
+            )
+        else:
+            attn_cfg = AttentionConfig(
+                attn_type="standard",
+                d_model=h.d_model,
+                n_head=h.n_head,
+                block_size=h.block_size,
+                dropout=h.dropout,
+            )
+
         return cls(
-            h.vocab_size,
-            h.n_layer,
-            h.d_model,
-            h.block_size,
-            h.dropout,
-            attn_cfg,
-            mlp_cfg,
+            vocab_size=h.vocab_size,
+            n_layer=h.n_layer,
+            d_model=h.d_model,
+            block_size=h.block_size,
+            dropout=h.dropout,
+            attn=attn_cfg,
+            mlp=MLPConfig(h.d_model, h.dropout),
         )
