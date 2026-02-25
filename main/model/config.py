@@ -23,6 +23,7 @@ class Hyperparameters:
 
 @dataclass
 class AttentionConfig:
+    attn_type: str = "standard"
     d_model: int
     n_head: int
     block_size: int

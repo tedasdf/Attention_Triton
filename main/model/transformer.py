@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 
 from torch.nn import functional as F
-from model.attention import CausalSelfAttention
+from model.attention import get_attention
 from model.mlp import MLP
 from model.config import AttentionConfig, MLPConfig, GPTConfig
 
@@ -11,7 +11,7 @@ class Block(nn.Module):
     def __init__(self, attn_cfg: AttentionConfig, mlp_cfg: MLPConfig):
         super().__init__()
         self.ln1 = nn.LayerNorm(attn_cfg.d_model)
-        self.attn = CausalSelfAttention(attn_cfg)
+        self.attn = get_attention(attn_cfg.attn_type, config=attn_cfg)
         self.ln2 = nn.LayerNorm(mlp_cfg.d_model)
         self.mlp = MLP(mlp_cfg)
 
