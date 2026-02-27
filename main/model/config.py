@@ -22,6 +22,25 @@ class Hyperparameters:
 
 
 @dataclass
+class BaseAttentionConfig:
+    attn_type: str
+    d_model: int
+    n_head: int
+    block_size: int
+    dropout: float
+
+
+@dataclass
+class StandardAttentionConfig(BaseAttentionConfig):
+    pass
+
+
+@dataclass
+class PerformerAttentionConfig(BaseAttentionConfig):
+    nb_features: int = 256
+
+
+@dataclass
 class AttentionConfig:
     attn_type: str
     d_model: int
@@ -51,9 +70,28 @@ class GPTConfig:
     # Factory method to create from a flat dict (like your Hyperparameters)
     @classmethod
     def from_flat(cls, h: Hyperparameters):
-        attn_cfg = AttentionConfig(
-            h.attn_type, h.d_model, h.n_head, h.block_size, h.dropout
-        )
+        if h.attn_type == "standard":
+            attn_cfg = StandardAttentionConfig(
+                h.attn_type,
+                h.d_model,
+                h.n_head,
+                h.block_size,
+                h.dropout,
+            )
+
+        elif h.attn_type == "performer":
+            attn_cfg = PerformerAttentionConfig(
+                h.attn_type,
+                h.d_model,
+                h.n_head,
+                h.block_size,
+                h.dropout,
+                nb_features=h.nb_features,
+            )
+
+        else:
+            raise ValueError(f"Unknown attention type: {h.attn_type}")
+
         mlp_cfg = MLPConfig(h.d_model, h.dropout)
         return cls(
             h.vocab_size,

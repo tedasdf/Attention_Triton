@@ -4,7 +4,7 @@ import math
 
 
 class MultiLatentHeadAttn(nn.Module):
-    def __init__(self, cfg, max_seq_len=1024):
+    def __init__(self, cfg):
         super().__init__()
         assert cfg.d_model % cfg.n_head == 0
         self.n_head = cfg.n_head
@@ -27,10 +27,10 @@ class MultiLatentHeadAttn(nn.Module):
 
         # --- KV cache for autoregressive inference ---
         self.register_buffer(
-            "kv_cache_key", torch.zeros(1, self.n_head, max_seq_len, self.d_head)
+            "kv_cache_key", torch.zeros(1, self.n_head, cfg.block_size, self.d_head)
         )
         self.register_buffer(
-            "kv_cache_value", torch.zeros(1, self.n_head, max_seq_len, self.d_head)
+            "kv_cache_value", torch.zeros(1, self.n_head, cfg.block_size, self.d_head)
         )
         self.kv_index = 0  # current position in cache
 
