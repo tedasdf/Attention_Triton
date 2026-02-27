@@ -105,7 +105,7 @@ def main(parser):
     # 1. Create a config object from the dataclass
     schema = OmegaConf.structured(Hyperparameters)
     loaded_cfg = OmegaConf.load("main/config/base.yaml")
-    cfg = OmegaConf.merge(schema, loaded_cfg)
+    cfg = OmegaConf.merge(schema, loaded_cfg.hyperparameters)
 
     data_dir = Path(parser.data_dir)
     output_dir = Path(parser.output_dir)
