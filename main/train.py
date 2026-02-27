@@ -206,7 +206,9 @@ def main(parser):
         return losses / len(val_text)
 
     wandb_logger = WandbLogger(
-        project="ntp-transformer", config=cfg, enabled=not parser.smoke_test
+        project="ntp-transformer",
+        config=hyperparams_dict,
+        enabled=not parser.smoke_test,
     )
 
     ptr = 0
