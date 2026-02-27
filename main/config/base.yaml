@@ -6,6 +6,7 @@ hyperparameters:
   n_layer: 6
   n_head: 16
   d_model: 512
+  d_compression: 128
   dropout: 0.1
   nb_features: 256
   lr: 0.006          # Scientific notation (6e-3) is also supported

@@ -1,29 +1,30 @@
 import torch
 import torch.nn as nn
 import math
+from model.config import MultiLatentHeadAttnConfig
 
 
 class MultiLatentHeadAttn(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg: MultiLatentHeadAttnConfig):
         super().__init__()
         assert cfg.d_model % cfg.n_head == 0
         self.n_head = cfg.n_head
         self.d_model = cfg.d_model
         self.d_head = cfg.d_model // cfg.n_head
-        self.d_c = cfg.d_c
+        self.d_compression = cfg.d_compression
 
         # --- KV compression ---
-        self.W_DKV = nn.Linear(cfg.d_model, cfg.d_c)
-        self.W_UK = nn.Linear(cfg.d_c, cfg.d_model)
-        self.W_UV = nn.Linear(cfg.d_c, cfg.d_model)
+        self.W_DKV = nn.Linear(cfg.d_model, cfg.d_compression)
+        self.W_UK = nn.Linear(cfg.d_compression, cfg.d_model)
+        self.W_UV = nn.Linear(cfg.d_d_compressionc, cfg.d_model)
 
         # --- Q compression ---
-        self.W_DQ = nn.Linear(cfg.d_model, cfg.d_c)
-        self.W_UQ = nn.Linear(cfg.d_c, cfg.d_model)
+        self.W_DQ = nn.Linear(cfg.d_model, cfg.d_compression)
+        self.W_UQ = nn.Linear(cfg.d_compression, cfg.d_model)
 
         # --- RoPE projections ---
-        self.W_QR = nn.Linear(cfg.d_model, cfg.d_c)
-        self.W_KR = nn.Linear(cfg.d_model, cfg.d_c)
+        self.W_QR = nn.Linear(cfg.d_model, cfg.d_d_compressionc)
+        self.W_KR = nn.Linear(cfg.d_model, cfg.d_compression)
 
         # --- KV cache for autoregressive inference ---
         self.register_buffer(

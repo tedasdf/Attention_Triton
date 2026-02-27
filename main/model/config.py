@@ -21,6 +21,13 @@ class Hyperparameters:
     val_frac: float = 0.10
     log_file: str = "./logs/mainrun.log"
 
+    nb_features: int = 256
+
+    d_compression: int = 128
+
+    n_kv_heads: int = 16
+    linformer_k: int = 32
+
 
 @dataclass
 class BaseAttentionConfig:
@@ -39,6 +46,21 @@ class StandardAttentionConfig(BaseAttentionConfig):
 @dataclass
 class PerformerAttentionConfig(BaseAttentionConfig):
     nb_features: int = 256
+
+
+@dataclass
+class MultiLatentHeadAttnConfig(BaseAttentionConfig):
+    d_compression: int = 128
+
+
+@dataclass
+class GQAConfig(BaseAttentionConfig):
+    n_kv_heads: int = 16
+
+
+@dataclass
+class LinFormerConfig(BaseAttentionConfig):
+    linformer_k: int = 32
 
 
 @dataclass
@@ -88,6 +110,26 @@ class GPTConfig:
                 h.block_size,
                 h.dropout,
                 nb_features=h.nb_features,
+            )
+
+        elif h.attn_type == "gpa":
+            attn_cfg = GQAConfig(
+                h.attn_type, h.d_model, h.n_head, h.block_size, h.dropout, h.n_kv_heads
+            )
+
+        elif h.attn_type == "linformer":
+            attn_cfg = LinFormerConfig(
+                h.attn_type, h.d_model, h.n_head, h.block_size, h.dropout, h.linformer_k
+            )
+
+        elif h.attn_type == "mla":
+            attn_cfg = MultiLatentHeadAttnConfig(
+                h.attn_type,
+                h.d_model,
+                h.n_head,
+                h.block_size,
+                h.dropout,
+                h.d_compression,
             )
 
         else:

@@ -7,7 +7,7 @@ class LinFormerAttn(nn.Module):  # Inherit or ensure CausalSelfAttention matches
     def __init__(self, cfg):
         super().__init__()
         self.n_head = cfg.n_head
-        self.head_dim = cfg.n_embd // cfg.n_head
+        self.head_dim = cfg.d_model // cfg.n_head
         self.k_proj = cfg.linformer_k  # The reduced dimension, e.g., 128 or 256
 
         # Projection matrices E and F (mapping sequence length T -> k)
@@ -15,8 +15,8 @@ class LinFormerAttn(nn.Module):  # Inherit or ensure CausalSelfAttention matches
         self.E = nn.Linear(cfg.block_size, self.k_proj)
         self.F = nn.Linear(cfg.block_size, self.k_proj)
 
-        self.qkv = nn.Linear(cfg.n_embd, 3 * cfg.n_embd)
-        self.proj = nn.Linear(cfg.n_embd, cfg.n_embd)
+        self.qkv = nn.Linear(cfg.d_model, 3 * cfg.d_model)
+        self.proj = nn.Linear(cfg.d_model, cfg.d_model)
 
     def forward(self, x):
         B, T, C = x.size()
