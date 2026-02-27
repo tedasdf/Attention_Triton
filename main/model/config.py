@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Hyperparameters:
+    nb_features: int = 256
     block_size: int = 128
     batch_size: int = 128
     vocab_size: int = 16_000
