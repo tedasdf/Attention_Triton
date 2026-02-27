@@ -1,7 +1,7 @@
 import torch
 import math
 
-from standard import CausalSelfAttention
+from .standard import CausalSelfAttention
 from model.config import PerformerAttentionConfig
 
 
