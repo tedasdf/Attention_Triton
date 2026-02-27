@@ -137,7 +137,7 @@ def main(parser):
     global logger
     logger = configure_logging(cfg.log_file)
 
-    hyperparams_dict = vars(cfg)
+    hyperparams_dict = vars(OmegaConf.to_container(cfg, resolve=True))
     logger.log("hyperparameters_configured", **hyperparams_dict)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
