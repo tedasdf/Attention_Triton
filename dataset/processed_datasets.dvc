@@ -1,0 +1,6 @@
+outs:
+- md5: d094b36ea76a1f04d175f2dac84ad98c.dir
+  size: 4383745820
+  nfiles: 906
+  hash: md5
+  path: processed_datasets
