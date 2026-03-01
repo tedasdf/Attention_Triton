@@ -256,21 +256,34 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
     }
 
 
-def convert_batch_pyarrow(
+def convert_batch_pyarrow_table(
     batch: pa.Table, dataset_name: str, include_context: bool = False
-):
-    # Convert arrow batch -> list of python dict rows
-    # (safe, simple; a bit of overhead but works everywhere)
+) -> pa.Table:
     rows = batch.to_pylist()
 
-    out = []
+    out_rows = []
     for row in rows:
         r = convert_unified_python_row(
             row, dataset_name, include_context=include_context
         )
         if r is not None:
-            out.append(r)
-    return out
+            out_rows.append(r)
+
+    # IMPORTANT: return an Arrow Table, not a Python list
+    if not out_rows:
+        # Return an empty table with the expected schema
+        return pa.table(
+            {
+                "dataset": pa.array([], pa.string()),
+                "id": pa.array([], pa.string()),
+                "instruction": pa.array([], pa.string()),
+                "code_ref": pa.array([], pa.string()),
+                "language": pa.array([], pa.string()),
+                "has_code": pa.array([], pa.bool_()),
+            }
+        )
+
+    return pa.Table.from_pylist(out_rows)
 
 
 if __name__ == "__main__":
@@ -290,7 +303,7 @@ if __name__ == "__main__":
     # 0) the-vault-inline
     ds_vault = ray.data.read_parquet(P("the-vault-inline", "data", "train"))
     out_vault = ds_vault.map_batches(
-        lambda b: convert_batch_pyarrow(
+        lambda b: convert_batch_pyarrow_table(
             b, dataset_name="the-vault-inline_train", include_context=False
         ),
         batch_size=512,
@@ -305,7 +318,7 @@ if __name__ == "__main__":
         P("CodeNet-24K", "data", "train-00000-of-00001.parquet")
     )
     out_codenet = ds_codenet.map_batches(
-        lambda b: convert_batch_pyarrow(b, "CodeNet-24K_train"),
+        lambda b: convert_batch_pyarrow_table(b, "CodeNet-24K_train"),
         batch_size=512,
         batch_format="pyarrow",
     ).filter(lambda r: r is not None and r["has_code"])
@@ -314,7 +327,7 @@ if __name__ == "__main__":
     # 2) jinaai/code_exercises
     ds_codeex = ray.data.read_parquet(P("code_exercises", "data"))
     out_codeex = ds_codeex.map_batches(
-        lambda b: convert_batch_pyarrow(b, dataset_name="jinaai_code_exercises"),
+        lambda b: convert_batch_pyarrow_table(b, dataset_name="jinaai_code_exercises"),
         batch_size=512,
         batch_format="pyarrow",
         zero_copy_batch=True,
@@ -327,7 +340,9 @@ if __name__ == "__main__":
         P("CodeExercise-Python-27k", "CodeExercise-Python-27k.json")
     )
     out_codeex27k = ds_codeex27k.map_batches(
-        lambda b: convert_batch_pyarrow(b, dataset_name="CodeExercise-Python-27k"),
+        lambda b: convert_batch_pyarrow_table(
+            b, dataset_name="CodeExercise-Python-27k"
+        ),
         batch_size=512,
         batch_format="pyarrow",
         zero_copy_batch=True,
@@ -338,7 +353,7 @@ if __name__ == "__main__":
     # 4) codesearchnet pair
     ds_codesearchnet = ray.data.read_parquet(P("codesearchnet", "pair"))
     out_codesearchnet = ds_codesearchnet.map_batches(
-        lambda b: convert_batch_pyarrow(
+        lambda b: convert_batch_pyarrow_table(
             b, dataset_name="sentence-transformers_codesearchnet_pair"
         ),
         batch_size=512,
@@ -360,7 +375,7 @@ if __name__ == "__main__":
 
     ds_taco = ray.data.from_arrow(combined_table)
     out_taco = ds_taco.map_batches(
-        lambda b: convert_batch_pyarrow(b, dataset_name="BAAI_TACO_train"),
+        lambda b: convert_batch_pyarrow_table(b, dataset_name="BAAI_TACO_train"),
         batch_size=512,
         batch_format="pyarrow",
         zero_copy_batch=True,
