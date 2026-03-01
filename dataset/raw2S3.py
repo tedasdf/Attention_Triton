@@ -298,12 +298,18 @@ if __name__ == "__main__":
     import pyarrow as pa
     from ray.data import DataContext
 
+    DATA_PATH = "/home/fypits25/Documents/ted_backyard/ray_tutorial/raw_datasets"
+
+    def P(*parts):
+        """Join paths relative to DATA_PATH."""
+        return os.path.join(DATA_PATH, *parts)
+
     # Ray speed knobs
     ctx = DataContext.get_current()
     ctx.execution_options.preserve_order = False
 
     # 0) the-vault-inline
-    ds_vault = ray.data.read_parquet("./raw_datasets/the-vault-inline/data/ALL")
+    ds_vault = ray.data.read_parquet(P("the-vault-inline", "data", "train"))
     out_vault = ds_vault.map_batches(
         lambda b: convert_batch(
             b, dataset_name="the-vault-inline/train", include_context=False
@@ -317,7 +323,7 @@ if __name__ == "__main__":
 
     # 1) CodeNet-24K
     ds_codenet = ray.data.read_parquet(
-        "./raw_datasets/CodeNet-24K/data/train-00000-of-00001.parquet"
+        P("CodeNet-24K", "data", "train-00000-of-00001.parquet")
     )
     out_codenet = ds_codenet.map_batches(
         lambda b: convert_batch(b, dataset_name="CodeNet-24K_train"),
@@ -329,7 +335,7 @@ if __name__ == "__main__":
     print("codenet samples:", out_codenet.take(1))
 
     # 2) jinaai/code_exercises
-    ds_codeex = ray.data.read_parquet("./raw_datasets/code_exercises/data")
+    ds_codeex = ray.data.read_parquet(P("code_exercises", "data"))
     out_codeex = ds_codeex.map_batches(
         lambda b: convert_batch(b, dataset_name="jinaai_code_exercises"),
         batch_size=512,
@@ -341,7 +347,7 @@ if __name__ == "__main__":
 
     # 3) CodeExercise-Python-27k (JSON)
     ds_codeex27k = ray.data.read_json(
-        "raw_datasets/CodeExercise-Python-27k/CodeExercise-Python-27k.json"
+        P("CodeExercise-Python-27k", "CodeExercise-Python-27k.json")
     )
     out_codeex27k = ds_codeex27k.map_batches(
         lambda b: convert_batch(b, dataset_name="CodeExercise-Python-27k"),
@@ -353,7 +359,7 @@ if __name__ == "__main__":
     print("codeex27k samples:", out_codeex27k.take(1))
 
     # 4) codesearchnet pair
-    ds_codesearchnet = ray.data.read_parquet("raw_datasets/codesearchnet/pair")
+    ds_codesearchnet = ray.data.read_parquet(P("codesearchnet", "pair"))
     out_codesearchnet = ds_codesearchnet.map_batches(
         lambda b: convert_batch(
             b, dataset_name="sentence-transformers_codesearchnet_pair"
@@ -366,7 +372,7 @@ if __name__ == "__main__":
     print("codesearchnet samples:", out_codesearchnet.take(1))
 
     # 5) TACO (arrow shards)
-    taco_path = "raw_datasets/TACO/train/"
+    taco_path = P("TACO", "train")
     arrow_files = [
         os.path.join(taco_path, f)
         for f in os.listdir(taco_path)
