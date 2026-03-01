@@ -4,6 +4,9 @@ import re
 import uuid
 import json
 import ast
+import pyarrow as pa
+import os
+
 
 ######################
 # HELPER FUNCTION
@@ -79,8 +82,7 @@ def parse_solutions_field(solutions):
 def convert_unified_python_row(row, dataset_name: str, include_context: bool = False):
     rid = get_row_id(row)
 
-    # ---------- CodeNet-24K ---------- (done)
-    # Detect by presence of these columns
+    # ---------- CodeNet-24K ----------
     if "attempt" in row and (
         "problem_description" in row
         or "input_description" in row
@@ -91,7 +93,6 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
         output_desc = (row.get("output_description") or "").strip()
         samples = (row.get("samples") or "").strip()
 
-        # Build instruction (choose how much you want)
         parts = []
         if problem_desc:
             parts.append(problem_desc)
@@ -103,11 +104,8 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             parts.append("Samples:\n" + samples)
 
         instruction = "\n\n".join(parts).strip()
-
         code_ref = clean_code_python(row.get("attempt") or "")
 
-        # If you want stable IDs for this dataset:
-        # submission_id is usually unique; otherwise combine problem_id + submission_id
         sub = row.get("submission_id")
         pid = row.get("problem_id")
         if sub:
@@ -122,17 +120,13 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             "code_ref": code_ref,
             "language": "python",
             "has_code": bool(code_ref),
-            # optional debugging metadata:
-            # "status": row.get("status"),
-            # "problem_id": row.get("problem_id"),
         }
 
     # ---------- vault-inline (PYTHON ONLY) ----------
     if "hexsha" in row and "repo" in row and "path" in row and "code" in row:
-        # keep only python rows
         lang = (row.get("language") or "").strip().lower()
         if lang and lang != "python":
-            return None  # will filter out later
+            return None
 
         instruction = (row.get("comment") or row.get("original_comment") or "").strip()
 
@@ -150,11 +144,11 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             "id": rid,
             "instruction": instruction,
             "code_ref": code_ref,
-            "language": "python",  # force python
+            "language": "python",
             "has_code": bool(code_ref),
         }
 
-    # ---------- TACO-like ---------- BAAI/TACO
+    # ---------- TACO-like ----------
     if "question" in row and ("solutions" in row or "starter_code" in row):
         instruction = (row.get("question") or "").strip()
         starter = row.get("starter_code") or ""
@@ -178,7 +172,7 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             "has_code": bool(code_ref),
         }
 
-    # ---------- code_exercises ---------- jinaai/code_exercises
+    # ---------- code_exercises ----------
     if "problem" in row or "solution" in row:
         raw_problem = row.get("problem") or ""
         raw_solution = row.get("solution") or ""
@@ -193,10 +187,36 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             "has_code": bool(code_ref),
         }
 
-    # ---------- comment/code pair ---------- sentence-transformers/codesearchnet
-    if "comment" in row and "code" in row:
-        instruction = (row.get("comment") or "").strip()
-        code_ref = clean_code_python(row.get("code") or "")
+    # ---------- CodeExercise-Python-27k (chat_rounds) ----------
+    if "chat_rounds" in row:
+        chat_rounds = row.get("chat_rounds") or []
+
+        if isinstance(chat_rounds, str):
+            try:
+                import json
+
+                chat_rounds = json.loads(chat_rounds)
+            except Exception:
+                chat_rounds = []
+
+        human = ""
+        bot = ""
+        if isinstance(chat_rounds, list):
+            for r in chat_rounds:
+                if not isinstance(r, dict):
+                    continue
+                role = (r.get("role") or "").lower().strip()
+                content = r.get("content") or ""
+                if role in ("human", "user") and not human:
+                    human = str(content)
+                elif role in ("bot", "assistant") and not bot:
+                    bot = str(content)
+                if human and bot:
+                    break
+
+        instruction = human.strip()
+        code_ref = clean_code_python(bot)
+
         return {
             "dataset": dataset_name,
             "id": rid,
@@ -206,40 +226,10 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
             "has_code": bool(code_ref),
         }
 
-    # ---------- CodeExercise-Python-27k (chat_rounds) ----------
-    if "chat_rounds" in row:
-        chat_rounds = row.get("chat_rounds") or []
-
-        # Sometimes it's a JSON string instead of a list
-        if isinstance(chat_rounds, str):
-            try:
-                import json
-
-                chat_rounds = json.loads(chat_rounds)
-            except Exception:
-                chat_rounds = []
-
-        # Extract first human + first bot message
-        human = ""
-        bot = ""
-        if isinstance(chat_rounds, list):
-            for r in chat_rounds:
-                if not isinstance(r, dict):
-                    continue
-                role = (r.get("role") or "").lower().strip()
-                content = r.get("content") or ""
-                if role == "human" and not human:
-                    human = str(content)
-                elif role == "bot" and not bot:
-                    bot = str(content)
-                if human and bot:
-                    break
-
-        instruction = human.strip()
-        code_ref = clean_code_python(
-            bot
-        )  # or clean_code_logic(bot) if you prefer that cleaner
-
+    # ---------- comment/code pair ----------
+    if "comment" in row and "code" in row:
+        instruction = (row.get("comment") or "").strip()
+        code_ref = clean_code_python(row.get("code") or "")
         return {
             "dataset": dataset_name,
             "id": rid,
@@ -305,19 +295,106 @@ def convert_batch(batch, dataset_name: str, include_context: bool = False):
 
 
 if __name__ == "__main__":
-    # Example: vault-inline
-    ds_vault = ray.data.read_parquet("the-vault-inline/data/train")
+    import pyarrow as pa
+    from ray.data import DataContext
 
-    transformed_vault = ds_vault.map_batches(
+    # Ray speed knobs
+    ctx = DataContext.get_current()
+    ctx.execution_options.preserve_order = False
+
+    # 0) the-vault-inline
+    ds_vault = ray.data.read_parquet("./raw_datasets/the-vault-inline/data/ALL")
+    out_vault = ds_vault.map_batches(
         lambda b: convert_batch(
             b, dataset_name="the-vault-inline/train", include_context=False
         ),
-        batch_size=512,  # tweak: 256 / 512 / 1024 depending on memory
-        batch_format="native",  # dict-of-lists (fast)
-        zero_copy_batch=True,  # faster when possible
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("vault samples:", out_vault.take(1))
+
+    # 1) CodeNet-24K
+    ds_codenet = ray.data.read_parquet(
+        "./raw_datasets/CodeNet-24K/data/train-00000-of-00001.parquet"
     )
+    out_codenet = ds_codenet.map_batches(
+        lambda b: convert_batch(b, dataset_name="CodeNet-24K_train"),
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
 
-    # Optionally drop empty code
-    transformed_vault = transformed_vault.filter(lambda r: r["has_code"])
+    print("codenet samples:", out_codenet.take(1))
 
-    transformed_vault.take(3)
+    # 2) jinaai/code_exercises
+    ds_codeex = ray.data.read_parquet("./raw_datasets/code_exercises/data")
+    out_codeex = ds_codeex.map_batches(
+        lambda b: convert_batch(b, dataset_name="jinaai_code_exercises"),
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("code_exercises samples:", out_codeex.take(1))
+
+    # 3) CodeExercise-Python-27k (JSON)
+    ds_codeex27k = ray.data.read_json(
+        "raw_datasets/CodeExercise-Python-27k/CodeExercise-Python-27k.json"
+    )
+    out_codeex27k = ds_codeex27k.map_batches(
+        lambda b: convert_batch(b, dataset_name="CodeExercise-Python-27k"),
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("codeex27k samples:", out_codeex27k.take(1))
+
+    # 4) codesearchnet pair
+    ds_codesearchnet = ray.data.read_parquet("raw_datasets/codesearchnet/pair")
+    out_codesearchnet = ds_codesearchnet.map_batches(
+        lambda b: convert_batch(
+            b, dataset_name="sentence-transformers_codesearchnet_pair"
+        ),
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("codesearchnet samples:", out_codesearchnet.take(1))
+
+    # 5) TACO (arrow shards)
+    taco_path = "raw_datasets/TACO/train/"
+    arrow_files = [
+        os.path.join(taco_path, f)
+        for f in os.listdir(taco_path)
+        if f.endswith(".arrow")
+    ]
+    tables = [pa.ipc.open_stream(f).read_all() for f in arrow_files]
+    combined_table = pa.concat_tables(tables)
+
+    ds_taco = ray.data.from_arrow(combined_table)
+    out_taco = ds_taco.map_batches(
+        lambda b: convert_batch(b, dataset_name="BAAI_TACO_train"),
+        batch_size=512,
+        batch_format="native",
+        zero_copy_batch=True,
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("taco samples:", out_taco.take(1))
+
+    # 6) UNION ALL
+    all_ds = (
+        out_codeex.union(out_codeex27k)
+        .union(out_codenet)
+        .union(out_codesearchnet)
+        .union(out_taco)
+        .union(out_vault)
+    ).filter(lambda r: r is not None and r["has_code"])
+
+    print("ALL samples:", all_ds.take(3))
+    print("ALL count:", all_ds.count())
+
+    # all_ds.write_parquet("./processed_datasets/unified_python")
