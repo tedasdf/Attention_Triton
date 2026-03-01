@@ -256,41 +256,20 @@ def convert_unified_python_row(row, dataset_name: str, include_context: bool = F
     }
 
 
-def convert_batch(batch, dataset_name: str, include_context: bool = False):
-    """
-    Ray will pass a batch (dict-of-lists or pandas.DataFrame depending on batch_format).
-    We return a list[dict] where each dict is one output row.
-    """
+def convert_batch_pyarrow(
+    batch: pa.Table, dataset_name: str, include_context: bool = False
+):
+    # Convert arrow batch -> list of python dict rows
+    # (safe, simple; a bit of overhead but works everywhere)
+    rows = batch.to_pylist()
+
     out = []
-
-    # dict-of-lists case (recommended: batch_format="native")
-    if isinstance(batch, dict):
-        n = len(next(iter(batch.values()))) if batch else 0
-        for i in range(n):
-            row = {k: batch[k][i] for k in batch}
-            r = convert_unified_python_row(
-                row, dataset_name, include_context=include_context
-            )
-            if r is not None:
-                out.append(r)
-        return out
-
-    # pandas.DataFrame case
-    try:
-        import pandas as pd
-
-        if isinstance(batch, pd.DataFrame):
-            for row in batch.to_dict(orient="records"):
-                r = convert_unified_python_row(
-                    row, dataset_name, include_context=include_context
-                )
-                if r is not None:
-                    out.append(r)
-            return out
-    except Exception:
-        pass
-
-    # fallback (shouldn’t happen)
+    for row in rows:
+        r = convert_unified_python_row(
+            row, dataset_name, include_context=include_context
+        )
+        if r is not None:
+            out.append(r)
     return out
 
 
@@ -311,12 +290,12 @@ if __name__ == "__main__":
     # 0) the-vault-inline
     ds_vault = ray.data.read_parquet(P("the-vault-inline", "data", "train"))
     out_vault = ds_vault.map_batches(
-        lambda b: convert_batch(
-            b, dataset_name="the-vault-inline/train", include_context=False
+        lambda b: convert_batch_pyarrow(
+            b, dataset_name="the-vault-inline_train", include_context=False
         ),
         batch_size=512,
-        batch_format="native",
         zero_copy_batch=True,
+        batch_format="pyarrow",
     ).filter(lambda r: r is not None and r["has_code"])
 
     print("vault samples:", out_vault.take(1))
@@ -326,20 +305,18 @@ if __name__ == "__main__":
         P("CodeNet-24K", "data", "train-00000-of-00001.parquet")
     )
     out_codenet = ds_codenet.map_batches(
-        lambda b: convert_batch(b, dataset_name="CodeNet-24K_train"),
+        lambda b: convert_batch_pyarrow(b, "CodeNet-24K_train"),
         batch_size=512,
-        batch_format="native",
-        zero_copy_batch=True,
+        batch_format="pyarrow",
     ).filter(lambda r: r is not None and r["has_code"])
-
     print("codenet samples:", out_codenet.take(1))
 
     # 2) jinaai/code_exercises
     ds_codeex = ray.data.read_parquet(P("code_exercises", "data"))
     out_codeex = ds_codeex.map_batches(
-        lambda b: convert_batch(b, dataset_name="jinaai_code_exercises"),
+        lambda b: convert_batch_pyarrow(b, dataset_name="jinaai_code_exercises"),
         batch_size=512,
-        batch_format="native",
+        batch_format="pyarrow",
         zero_copy_batch=True,
     ).filter(lambda r: r is not None and r["has_code"])
 
@@ -350,9 +327,9 @@ if __name__ == "__main__":
         P("CodeExercise-Python-27k", "CodeExercise-Python-27k.json")
     )
     out_codeex27k = ds_codeex27k.map_batches(
-        lambda b: convert_batch(b, dataset_name="CodeExercise-Python-27k"),
+        lambda b: convert_batch_pyarrow(b, dataset_name="CodeExercise-Python-27k"),
         batch_size=512,
-        batch_format="native",
+        batch_format="pyarrow",
         zero_copy_batch=True,
     ).filter(lambda r: r is not None and r["has_code"])
 
@@ -361,11 +338,11 @@ if __name__ == "__main__":
     # 4) codesearchnet pair
     ds_codesearchnet = ray.data.read_parquet(P("codesearchnet", "pair"))
     out_codesearchnet = ds_codesearchnet.map_batches(
-        lambda b: convert_batch(
+        lambda b: convert_batch_pyarrow(
             b, dataset_name="sentence-transformers_codesearchnet_pair"
         ),
         batch_size=512,
-        batch_format="native",
+        batch_format="pyarrow",
         zero_copy_batch=True,
     ).filter(lambda r: r is not None and r["has_code"])
 
@@ -383,9 +360,9 @@ if __name__ == "__main__":
 
     ds_taco = ray.data.from_arrow(combined_table)
     out_taco = ds_taco.map_batches(
-        lambda b: convert_batch(b, dataset_name="BAAI_TACO_train"),
+        lambda b: convert_batch_pyarrow(b, dataset_name="BAAI_TACO_train"),
         batch_size=512,
-        batch_format="native",
+        batch_format="pyarrow",
         zero_copy_batch=True,
     ).filter(lambda r: r is not None and r["has_code"])
 
