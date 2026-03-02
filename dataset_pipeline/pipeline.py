@@ -112,7 +112,7 @@ if __name__ == "__main__":
         help="Path to pipeline YAML config.",
     )
     parser.add_argument(
-        "---output_dir",
+        "--output_dir",
         type=str,
         default=None,
         help="Path to pipeline YAML config.",
@@ -120,5 +120,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data_preprocess(
-        cfg_path=args.config, input_dir=args.input_dir, out_dir=args.output_dir
+        input_dir=args.input_dir, out_dir=args.output_dir, cfg_path=args.config
     )
