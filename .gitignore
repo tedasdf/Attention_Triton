@@ -26,3 +26,5 @@ logs/
 .dvc/cache
 .dvc/tmp
 .dvc/updater
+
+*.parquet

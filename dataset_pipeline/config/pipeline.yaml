@@ -1,0 +1,17 @@
+
+canonicalization:
+  language: python
+  representation: node_types     # node_types or dump
+  traversal: preorder            # only used for node_types
+
+  remove_docstrings: true
+  rename_locals: true
+  rename_args: true
+  rename_function_names: false
+  rename_class_names: false
+
+  normalize_literals: basic      # none | basic | aggressive
+  keep_builtins: true
+
+  max_code_chars: 200000
+  on_parse_error: skip           # skip | fallback
