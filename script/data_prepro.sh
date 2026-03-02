@@ -11,7 +11,7 @@ echo "📥 DVC pull: $INPUT_PATH (remote: $REMOTE)"
 dvc pull "$INPUT_PATH" -r "$REMOTE"
 
 echo "⚙️  Running pipeline..."
-python dataset_pipeline/pipeline.py --config "./config/pipeline.yaml" --input_dir "$INPUT_PATH" --output_dir "$OUTPUT_PATH"
+python dataset_pipeline/pipeline.py --config "/home/fypits25/Documents/ted_backyard/actions-runner/_work/Attention_Triton/Attention_Triton/dataset_pipeline/config/pipeline.yaml" --input_dir "$INPUT_PATH" --output_dir "$OUTPUT_PATH"
 
 echo "➕ Tracking output with DVC: $OUTPUT_PATH"
 dvc add "$OUTPUT_PATH"
