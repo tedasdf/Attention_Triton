@@ -10,9 +10,6 @@ from stages.snapshot import DedupConfig
 
 @dataclass
 class RunConfig:
-    input_parquet: str
-    intermediate_dir: str = "intermediate"
-    snapshot_dir: str = "snapshots"
     version: str = "v0001"
     ray: dict[str, Any] = None  # init kwargs
 
