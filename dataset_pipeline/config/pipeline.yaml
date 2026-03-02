@@ -1,17 +1,42 @@
+run:
+  input_parquet: "../dataset/processed_datasets/unified_python"
+  snapshot_dir: "processed_datasets/coding_dataset"
+  version: "v0001"
+  ray:
+    init_kwargs: {}   # e.g. {"num_cpus": 8, "object_store_memory": 2000000000}
 
-canonicalization:
-  language: python
-  representation: node_types     # node_types or dump
-  traversal: preorder            # only used for node_types
-
+canonicalize:
+  representation: "node_types"   # node_types | dump
+  traversal: "preorder"          # preorder | postorder | bfs
+  on_parse_error: "skip"         # skip | fallback
+  max_code_chars: 200000
   remove_docstrings: true
   rename_locals: true
   rename_args: true
   rename_function_names: false
   rename_class_names: false
-
-  normalize_literals: basic      # none | basic | aggressive
+  normalize_literals: "basic"    # none | basic | aggressive
   keep_builtins: true
 
-  max_code_chars: 200000
-  on_parse_error: skip           # skip | fallback
+minhash:
+  shingle_n: 5
+  num_perm: 128
+  seed0: 1337
+
+lsh:
+  batch_size: 512
+  k: 128
+  b: 32
+  max_bucket_size: 2000
+
+snapshot:
+  mode: "cluster"                # exact | cluster
+  key_col: null                  # override key if you want, else null
+  # keep_cols:
+  #   - dataset
+  #   - id
+  #   - instruction
+  #   - code_ref
+  #   - language
+  #   - has_code
+  #   - cluster_id
