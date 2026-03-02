@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="/home/fypits25/Documents/ted_backyard/actions-runner/_work/Attention_Triton/Attention_Triton/dataset"
-cd "$REPO_DIR"
+
 
 REMOTE="mys3remote"
 INPUT_PATH="/home/fypits25/Documents/ted_backyard/actions-runner/_work/Attention_Triton/Attention_Triton/dataset/processed_datasets/unified_python"
