@@ -1,4 +1,3 @@
-import os
 import ray
 
 from stages.cluster_ids import build_id_to_cluster, make_add_cluster_id
@@ -10,13 +9,17 @@ from stages.canonicalize import canonicalize
 from config import load_pipeline_config
 
 
-def data_preprocess(cfg_path="./config/pipeline.yaml"):
+def data_preprocess(
+    input_dir,
+    out_dir,
+    cfg_path="./config/pipeline.yaml",
+):
     cfg = load_pipeline_config(cfg_path)
 
     # init ray ONCE here
     ray.init(**(cfg.run.ray.get("init_kwargs", {}) if cfg.run.ray else {}))
 
-    ds = ray.data.read_parquet(cfg.run.input_parquet)
+    ds = ray.data.read_parquet(input_dir)
 
     def add_node_types(row):
         if row.get("language") != "python" or not row.get("has_code"):
@@ -83,14 +86,10 @@ def data_preprocess(cfg_path="./config/pipeline.yaml"):
     reps_out = reps.select_columns([c for c in keep_cols if c in reps.schema().names])
 
     # Write snapshot
-    os.makedirs(cfg.run.snapshot_dir, exist_ok=True)
-    out_path = os.path.join(
-        cfg.run.snapshot_dir, f"snapshot_{cfg.snapshot.mode}_{cfg.run.version}"
-    )
-    reps_out.write_parquet(out_path)
+    reps_out.write_parquet(out_dir)
 
     print("group_by:", used_key)
-    print("wrote:", out_path)
+    print("wrote:", out_dir)
     print("sample:", reps_out.take(3))
 
 
@@ -106,6 +105,20 @@ if __name__ == "__main__":
         default="./config/pipeline.yaml",
         help="Path to pipeline YAML config.",
     )
+    parser.add_argument(
+        "--input_dir",
+        type=str,
+        default=None,
+        help="Path to pipeline YAML config.",
+    )
+    parser.add_argument(
+        "---output_dir",
+        type=str,
+        default=None,
+        help="Path to pipeline YAML config.",
+    )
     args = parser.parse_args()
 
-    data_preprocess(cfg_path=args.config)
+    data_preprocess(
+        cfg_path=args.config, input_dir=args.input_dir, out_dir=args.output_dir
+    )

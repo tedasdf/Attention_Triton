@@ -1,6 +1,4 @@
 run:
-  input_parquet: "../dataset/processed_datasets/unified_python"
-  snapshot_dir: "processed_datasets/coding_dataset"
   version: "v0001"
   ray:
     init_kwargs: {}   # e.g. {"num_cpus": 8, "object_store_memory": 2000000000}
