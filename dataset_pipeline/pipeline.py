@@ -1,6 +1,5 @@
 import ray
 
-from stages.cluster_ids import build_id_to_cluster, make_add_cluster_id
 from stages.snapshot import dedup_snapshot
 from stages.lsh import lsh_pairs_map_batches
 from stages.minihash import make_add_minhash
@@ -51,32 +50,28 @@ def data_preprocess(
             print("LSH UDF error:", type(e).__name__, e)
             return {"id1": [], "id2": []}
 
-    pairs_ds = (
-        ds_minihash.select_columns(["id", "sig", "sig_ok"])
-        .map_batches(
-            lsh_pairs_map_batches_safe,
-            batch_format="default",
-            batch_size=cfg.lsh.batch_size,
-            fn_kwargs={
-                "k": cfg.lsh.k,
-                "b": cfg.lsh.b,
-                "max_bucket_size": cfg.lsh.max_bucket_size,
-            },
-        )
-        .groupby(["id1", "id2"])
-        .count()
-        .drop_columns(["count()"])
+    pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
+        lsh_pairs_map_batches_safe,
+        batch_format="default",
+        batch_size=cfg.lsh.batch_size,
+        fn_kwargs={
+            "k": cfg.lsh.k,
+            "b": cfg.lsh.b,
+            "max_bucket_size": cfg.lsh.max_bucket_size,
+        },
     )
 
-    pairs = pairs_ds.take_all()
-
-    # Cluster IDs (local union-find)
-    id_to_cluster = build_id_to_cluster(pairs)
-    ds_with_cluster = ds_minihash.map(make_add_cluster_id(id_to_cluster))
+    pairs_out_dir = f"{out_dir}/pairs_v0001"
+    pairs_ds.write_parquet(pairs_out_dir)
+    print("wrote pairs:", pairs_out_dir)
+    return
+    # # Cluster IDs (local union-find)
+    # id_to_cluster = build_id_to_cluster(pairs)
+    # ds_with_cluster = ds_minihash.map(make_add_cluster_id(id_to_cluster))
 
     # Snapshot dedup
     reps, used_key = dedup_snapshot(
-        ds_with_cluster,
+        pairs_ds,
         mode=cfg.snapshot.mode,
         key_col=cfg.snapshot.key_col,
     )

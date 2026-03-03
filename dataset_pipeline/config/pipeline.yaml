@@ -28,7 +28,7 @@ lsh:
   max_bucket_size: 2000
 
 snapshot:
-  mode: "cluster"                # exact | cluster
+  mode: "exact"                # exact | cluster
   key_col: null                  # override key if you want, else null
   # keep_cols:
   #   - dataset
