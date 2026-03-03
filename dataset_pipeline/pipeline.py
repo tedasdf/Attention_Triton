@@ -1,9 +1,6 @@
 import ray
 
 from stages.snapshot import dedup_snapshot
-from stages.lsh import lsh_pairs_map_batches
-from stages.minihash import make_add_minhash
-from stages.canonicalize import canonicalize
 
 from config import load_pipeline_config
 
@@ -18,52 +15,57 @@ def data_preprocess(
     # init ray ONCE here
     ray.init(**(cfg.run.ray.get("init_kwargs", {}) if cfg.run.ray else {}))
 
-    ds = ray.data.read_parquet(input_dir)
+    # ds = ray.data.read_parquet(input_dir)
 
-    def add_node_types(row):
-        if row.get("language") != "python" or not row.get("has_code"):
-            row["parse_ok"] = False
-            row["node_types"] = []
-            row["parse_err"] = "not_python_or_no_code"
-            return row
+    # def add_node_types(row):
+    #     if row.get("language") != "python" or not row.get("has_code"):
+    #         row["parse_ok"] = False
+    #         row["node_types"] = []
+    #         row["parse_err"] = "not_python_or_no_code"
+    #         return row
 
-        res = canonicalize(row["code_ref"], cfg.canonicalize)
-        row["parse_ok"] = res.ok
-        row["node_types"] = res.rep if res.ok else []
-        row["parse_err"] = res.err
-        return row
+    #     res = canonicalize(row["code_ref"], cfg.canonicalize)
+    #     row["parse_ok"] = res.ok
+    #     row["node_types"] = res.rep if res.ok else []
+    #     row["parse_err"] = res.err
+    #     return row
 
-    ds2 = ds.map(add_node_types)
-    ds_canon = ds2.filter(lambda r: r.get("parse_ok", False))
+    # ds2 = ds.map(add_node_types)
+    # ds_canon = ds2.filter(lambda r: r.get("parse_ok", False))
 
-    # MinHash
-    ds_sig = ds_canon.map(make_add_minhash(cfg.minhash))
-    ds_minihash = ds_sig.filter(lambda r: r.get("sig_ok", False))
+    # # MinHash
+    # ds_sig = ds_canon.map(make_add_minhash(cfg.minhash))
+    # ds_minihash = ds_sig.filter(lambda r: r.get("sig_ok", False))
 
-    # LSH (prototype: per-batch)
-    def lsh_pairs_map_batches_safe(batch, k, b, max_bucket_size):
-        try:
-            return lsh_pairs_map_batches(
-                batch, k=k, b=b, max_bucket_size=max_bucket_size
-            )
-        except Exception as e:
-            print("LSH UDF error:", type(e).__name__, e)
-            return {"id1": [], "id2": []}
+    # # LSH (prototype: per-batch)
+    # def lsh_pairs_map_batches_safe(batch, k, b, max_bucket_size):
+    #     try:
+    #         return lsh_pairs_map_batches(
+    #             batch, k=k, b=b, max_bucket_size=max_bucket_size
+    #         )
+    #     except Exception as e:
+    #         print("LSH UDF error:", type(e).__name__, e)
+    #         return {"id1": [], "id2": []}
 
-    pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
-        lsh_pairs_map_batches_safe,
-        batch_format="default",
-        batch_size=cfg.lsh.batch_size,
-        fn_kwargs={
-            "k": cfg.lsh.k,
-            "b": cfg.lsh.b,
-            "max_bucket_size": cfg.lsh.max_bucket_size,
-        },
-    )
+    # pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
+    #     lsh_pairs_map_batches_safe,
+    #     batch_format="default",
+    #     batch_size=cfg.lsh.batch_size,
+    #     fn_kwargs={
+    #         "k": cfg.lsh.k,
+    #         "b": cfg.lsh.b,
+    #         "max_bucket_size": cfg.lsh.max_bucket_size,
+    #     },
+    # )
 
+    # pairs_out_dir = f"{out_dir}/pairs_v0001"
+    # pairs_ds.write_parquet(pairs_out_dir)
+    # print("wrote pairs:", pairs_out_dir)
+    # return
     pairs_out_dir = f"{out_dir}/pairs_v0001"
-    pairs_ds.write_parquet(pairs_out_dir)
-    print("wrote pairs:", pairs_out_dir)
+    pairs_ds = ray.data.read_parquet(pairs_out_dir)
+    print("pairs count:", pairs_ds.count())
+    print("sample:", pairs_ds.take(5))
     return
     # # Cluster IDs (local union-find)
     # id_to_cluster = build_id_to_cluster(pairs)
