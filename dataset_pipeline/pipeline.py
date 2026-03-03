@@ -82,7 +82,7 @@ def data_preprocess(
         },
     )
 
-    out_pairs = os.path.join(args.out_dir, f"pairs_safe_{args.version}")
+    out_pairs = os.path.join(out_dir, f"pairs_safe_{cfg.run.version}")
     pairs_ds.write_parquet(out_pairs)
 
     print("wrote pairs:", out_pairs)
