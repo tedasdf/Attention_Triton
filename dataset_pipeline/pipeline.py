@@ -1,6 +1,6 @@
 import ray
 
-from stages import canonicalize
+from stages.canonicalize import canonicalize
 from stages.minihash import make_add_minhash
 
 from config import load_pipeline_config
@@ -72,7 +72,7 @@ def data_preprocess(
     # print("sample:", pairs_ds.take(5))
     # lsh_safe = make_lsh_safe_wrapper(max_pairs_per_bucket=cfg.lsh.max_pairs_per_bucket)
 
-    # pairs_ds = pairs_ds.select_columns(["id", "sig", "sig_ok"]).map_batches(
+    # pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
     #     lsh_safe,
     #     batch_format="default",
     #     batch_size=cfg.lsh.batch_size,
@@ -91,11 +91,11 @@ def data_preprocess(
     # print("sample:", pairs_ds.take(5))
 
     # return
-    # # Cluster IDs (local union-find)
+    # Cluster IDs (local union-find)
     # id_to_cluster = build_id_to_cluster(pairs)
     # ds_with_cluster = ds_minihash.map(make_add_cluster_id(id_to_cluster))
 
-    # Snapshot dedup
+    # # Snapshot dedup
     # reps, used_key = dedup_snapshot(
     #     pairs_ds,
     #     mode=cfg.snapshot.mode,
