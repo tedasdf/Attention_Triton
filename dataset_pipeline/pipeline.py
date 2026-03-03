@@ -69,7 +69,7 @@ def data_preprocess(
     pairs_ds = ray.data.read_parquet(pairs_out_dir)
     print("pairs count:", pairs_ds.count())
     print("sample:", pairs_ds.take(5))
-    lsh_safe = make_lsh_safe_wrapper(max_pairs_per_bucket=args.max_pairs_per_bucket)
+    lsh_safe = make_lsh_safe_wrapper(max_pairs_per_bucket=cfg.lsh.max_pairs_per_bucket)
 
     pairs_ds = pairs_ds.select_columns(["id", "sig", "sig_ok"]).map_batches(
         lsh_safe,

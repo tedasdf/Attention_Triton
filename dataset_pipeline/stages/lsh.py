@@ -9,6 +9,7 @@ class LSHConfig:
     k: int = 128
     b: int = 32
     max_bucket_size: int = 2000
+    max_pairs_per_bucket: int = 2000
 
 
 def band_key(sig, band_idx, r):

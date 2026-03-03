@@ -26,6 +26,7 @@ lsh:
   k: 128
   b: 32
   max_bucket_size: 2000
+  max_pairs_per_bucket: 2000
 
 snapshot:
   mode: "exact"                # exact | cluster
