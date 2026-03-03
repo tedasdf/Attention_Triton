@@ -1,5 +1,8 @@
+import os
+
 import ray
 
+from stages.capping import make_lsh_safe_wrapper
 from stages.snapshot import dedup_snapshot
 
 from config import load_pipeline_config
@@ -66,6 +69,26 @@ def data_preprocess(
     pairs_ds = ray.data.read_parquet(pairs_out_dir)
     print("pairs count:", pairs_ds.count())
     print("sample:", pairs_ds.take(5))
+    lsh_safe = make_lsh_safe_wrapper(max_pairs_per_bucket=args.max_pairs_per_bucket)
+
+    pairs_ds = pairs_ds.select_columns(["id", "sig", "sig_ok"]).map_batches(
+        lsh_safe,
+        batch_format="default",
+        batch_size=cfg.lsh.batch_size,
+        fn_kwargs={
+            "k": cfg.lsh.k,
+            "b": cfg.lsh.b,
+            "max_bucket_size": cfg.lsh.max_bucket_size,
+        },
+    )
+
+    out_pairs = os.path.join(args.out_dir, f"pairs_safe_{args.version}")
+    pairs_ds.write_parquet(out_pairs)
+
+    print("wrote pairs:", out_pairs)
+    print("pairs count:", pairs_ds.count())
+    print("sample:", pairs_ds.take(5))
+
     return
     # # Cluster IDs (local union-find)
     # id_to_cluster = build_id_to_cluster(pairs)
