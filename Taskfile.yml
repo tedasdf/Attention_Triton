@@ -1,0 +1,44 @@
+version: "3"
+
+vars:
+  CONFIG_PREPROCESS: "configs/preprocess.yaml"
+  CONFIG_TRAIN: "configs/train.yaml"
+  CONFIG_EVAL: "configs/eval.yaml"
+  CONFIG_SERVE: "configs/serve.yaml"
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list
+
+  preprocess:
+    desc: "Run data preprocessing (config-driven)"
+    cmds:
+      - echo "==> Preprocess using config:{{.CONFIG_PREPROCESS}}"
+      - python dataset_pipeline/pipeline.py --config "{{.CONFIG_PREPROCESS}}"
+
+  train:
+    desc: "Run training (config-driven)"
+    cmds:
+      - echo "==> Train using config:{{.CONFIG_TRAIN}}"
+      - python main/train.py --config "{{.CONFIG_TRAIN}}"
+
+  eval:
+    desc: "Run evaluation (config-driven)"
+    cmds:
+      - echo "==> Eval using config:{{.CONFIG_EVAL}}"
+      - python main/eval.py --config "{{.CONFIG_EVAL}}"
+
+  serve:
+    desc: "Run serving (config-driven)"
+    cmds:
+      - echo "==> Serve using config:{{.CONFIG_SERVE}}"
+      - python main/serve.py --config "{{.CONFIG_SERVE}}"
+
+  stress:
+    desc: "Stress test (placeholder)"
+    cmds:
+      - echo "Stress task not implemented yet"
+      - cmd: exit 1
+        silent: true
