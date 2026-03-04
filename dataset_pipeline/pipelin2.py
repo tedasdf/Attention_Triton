@@ -93,7 +93,7 @@ def cluster_and_snapshot(
     # pandas batches are convenient here
     for pdf in pairs_ds.iter_batches(
         batch_size=cluster_cfg.pairs_batch_rows,
-        batch_format="pandas",
+        batch_format="pyarrow",
     ):
         # pdf has columns id1,id2
         for a, b in zip(pdf["id1"].tolist(), pdf["id2"].tolist()):
