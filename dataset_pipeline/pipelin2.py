@@ -87,51 +87,59 @@ def cluster_and_snapshot(
     os.makedirs(out_dir, exist_ok=True)
 
     # 1) Read pairs and build union-find STREAMING (no take_all)
-    pairs_ds = ray.data.read_parquet(pairs_out_dir).select_columns(["id1", "id2"])
-    uf = UnionFind()
+    # pairs_ds = ray.data.read_parquet(pairs_out_dir).select_columns(["id1", "id2"])
+    # uf = UnionFind()
 
-    # pandas batches are convenient here
-    for pdf in pairs_ds.iter_batches(
-        batch_size=cluster_cfg.pairs_batch_rows,
-        batch_format="pyarrow",
-    ):
-        # pdf has columns id1,id2
-        for a, b in zip(pdf["id1"].tolist(), pdf["id2"].tolist()):
-            uf.union(a, b)
+    # # pandas batches are convenient here
+    # for pdf in pairs_ds.iter_batches(
+    #     batch_size=cluster_cfg.pairs_batch_rows,
+    #     batch_format="pyarrow",
+    # ):
+    #     # pdf has columns id1,id2
+    #     for a, b in zip(pdf["id1"].tolist(), pdf["id2"].tolist()):
+    #         uf.union(a, b)
 
-    print("union-find built. unique ids seen in pairs:", len(uf.parent))
+    # print("union-find built. unique ids seen in pairs:", len(uf.parent))
 
     # 2) Write cluster map to parquet in chunks: (id, cluster_id)
     #    IMPORTANT: cluster_map only includes ids that appear in pairs.
     cluster_map_dir = os.path.join(out_dir, "cluster_map")
-    os.makedirs(cluster_map_dir, exist_ok=True)
+    # os.makedirs(cluster_map_dir, exist_ok=True)
 
-    rows = []
-    wrote_parts = 0
-    for _id in uf.parent.keys():
-        root = uf.find(_id)
-        cid = stable_cluster_id(root)
-        rows.append({"id": _id, "cluster_id": cid})
+    # rows = []
+    # wrote_parts = 0
+    # for _id in uf.parent.keys():
+    #     root = uf.find(_id)
+    #     cid = stable_cluster_id(root)
+    #     rows.append({"id": _id, "cluster_id": cid})
 
-        if len(rows) >= cluster_cfg.map_write_rows:
-            ray.data.from_items(rows).write_parquet(
-                os.path.join(cluster_map_dir, f"part_{wrote_parts:05d}")
-            )
-            wrote_parts += 1
-            rows = []
+    #     if len(rows) >= cluster_cfg.map_write_rows:
+    #         ray.data.from_items(rows).write_parquet(
+    #             os.path.join(cluster_map_dir, f"part_{wrote_parts:05d}")
+    #         )
+    #         wrote_parts += 1
+    #         rows = []
 
-    if rows:
-        ray.data.from_items(rows).write_parquet(
-            os.path.join(cluster_map_dir, f"part_{wrote_parts:05d}")
-        )
+    # if rows:
+    #     ray.data.from_items(rows).write_parquet(
+    #         os.path.join(cluster_map_dir, f"part_{wrote_parts:05d}")
+    #     )
 
-    print("wrote cluster_map:", cluster_map_dir)
+    # print("wrote cluster_map:", cluster_map_dir)
 
     # 3) Join minihash dataset with cluster_map on "id"
     ds_minihash = ray.data.read_parquet(minihash_out_dir)
 
     ds_cluster_map = ray.data.read_parquet(cluster_map_dir)  # (id, cluster_id)
-    ds_with_cluster = ds_minihash.join(ds_cluster_map, on="id", how="left")
+    local_map = {row["id"]: row["cluster_id"] for row in ds_cluster_map.take_all()}
+
+    # 2. Use a map function to "lookup" the cluster_id
+    def attach_cluster_id(row):
+        # This mimics a left join + fill_singletons in one go
+        row["cluster_id"] = local_map.get(row["id"], stable_md5(row["id"]))
+        return row
+
+    ds_with_cluster = ds_minihash.map(attach_cluster_id)
 
     # Fill singleton cluster_id for rows that never appeared in pairs
     def fill_singletons(row):
