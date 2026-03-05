@@ -2,6 +2,7 @@ import hashlib
 from dataclasses import dataclass
 from itertools import combinations
 import ray
+import random
 
 
 @dataclass
@@ -55,6 +56,11 @@ def lsh_pairs_map_batches(
         bucket_ids = sorted(set(bucket_ids))
         if len(bucket_ids) < 2 or len(bucket_ids) > max_bucket_size:
             continue
+
+        seed = int(hashlib.md5(key.encode("utf-8")).hexdigest()[:8], 16)
+        rng = random.Random(seed)
+        rng.shuffle(bucket_ids)
+
         pair_count = 0
         for a, c in combinations(bucket_ids, 2):
             out_id1.append(a)
