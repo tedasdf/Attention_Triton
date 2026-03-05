@@ -1,17 +1,31 @@
 import yaml
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
-from stages.canonicalize import CanonicalizerConfig
-from stages.minihash import MinHashConfig
-from stages.lsh import LSHConfig
-from stages.snapshot import DedupConfig
+from .stages.snapshot import DedupConfig
+from .stages.cluster import ClusterConfig
+from .stages.canonicalize import CanonicalizerConfig
+from .stages.minihash import MinHashConfig
+from .stages.pairs import LSHConfig
+# from stages.snapshot import DedupConfig
 
 
 @dataclass
 class RunConfig:
     version: str = "v0001"
-    ray: dict[str, Any] = None  # init kwargs
+    ray_init_kwargs: Optional[dict[str, Any]] = None
+    stages: Optional[list[str]] = None
+    input_dir: Optional[str] = None
+    output_dir: str = "artifacts/run/preprocess/"
+
+
+@dataclass
+class SplitConfig:
+    train: float
+    val: float
+    test: float
+    key: str
+    hash: str
 
 
 @dataclass
@@ -20,8 +34,10 @@ class PipelineConfig:
     canonicalize: CanonicalizerConfig
     minhash: MinHashConfig
     lsh: LSHConfig
+    cluster: ClusterConfig
     snapshot: DedupConfig
-    snapshot_keep_cols: list[str] | None = None
+    split: Optional[SplitConfig] = None
+    # snapshot_keep_cols: list[str] | None = None
 
 
 def load_pipeline_config(path: str) -> PipelineConfig:
@@ -31,15 +47,17 @@ def load_pipeline_config(path: str) -> PipelineConfig:
     run = RunConfig(**raw["run"])
     canon = CanonicalizerConfig(**raw["canonicalize"])
     mh = MinHashConfig(**raw["minhash"])
-    lsh = LSHConfig(**raw["lsh"])
+    lsh = LSHConfig(**raw["pairs"])
+    cluster = ClusterConfig(**raw["cluster"])
     snap = DedupConfig(**raw["snapshot"])
+    split = SplitConfig(**raw["split"]) if "split" in raw else None
 
-    keep_cols = raw.get("snapshot", {}).get("keep_cols")
     return PipelineConfig(
         run=run,
         canonicalize=canon,
         minhash=mh,
         lsh=lsh,
+        cluster=cluster,
         snapshot=snap,
-        snapshot_keep_cols=keep_cols,
+        split=split,
     )

@@ -1,146 +1,180 @@
-# import ray
-# import os
-# from stages.snapshot import dedup_snapshot
-# from stages.capping import make_lsh_safe_wrapper
+import ray
+import os
 
-# from config import load_pipeline_config
+from .stages.report_quality import run_data_quality_report
+from .stages.snapshot import run_stage_snapshot
+from .stages.cluster import run_stage_cluster_map
+from .data_utils import require_stage_output, preflight, write_done
+from .stages.canonicalize import run_stage_canonicalize
+from .stages.minihash import run_stage_minhash
+from .stages.pairs import run_stage_lsh
+from stages.split import run_stage_split
 
+from .config import load_pipeline_config
+from utils.run_context import start_run
 
-# def data_preprocess(
-#     input_dir,
-#     out_dir,
-#     cfg_path="./config/pipeline.yaml",
-# ):
-#     cfg = load_pipeline_config(cfg_path)
-
-#     # init ray ONCE here
-#     ray.init(**(cfg.run.ray.get("init_kwargs", {}) if cfg.run.ray else {}))
-
-#     ds = ray.data.read_parquet(input_dir)
-
-#     def add_node_types(row):
-#         if row.get("language") != "python" or not row.get("has_code"):
-#             row["parse_ok"] = False
-#             row["node_types"] = []
-#             row["parse_err"] = "not_python_or_no_code"
-#             return row
-
-#         res = canonicalize(row["code_ref"], cfg.canonicalize)
-#         row["parse_ok"] = res.ok
-#         row["node_types"] = res.rep if res.ok else []
-#         row["parse_err"] = res.err
-#         return row
-
-#     ds2 = ds.map(add_node_types)
-#     ds_canon = ds2.filter(lambda r: r.get("parse_ok", False))
-
-#     # MinHash
-#     ds_sig = ds_canon.map(make_add_minhash(cfg.minhash))
-#     ds_minihash = ds_sig.filter(lambda r: r.get("sig_ok", False))
-
-#     minihash_out_dir = f"{out_dir}/intermediate/minihash_v0001"
-#     # ds_minihash.write_parquet(minihash_out_dir)
-
-#     ds_minihash = ray.data.read_parquet(minihash_out_dir)
-
-#     # LSH (prototype: per-batch)
-#     def lsh_pairs_map_batches_safe(batch, k, b, max_bucket_size):
-#         try:
-#             return lsh_pairs_map_batches(
-#                 batch, k=k, b=b, max_bucket_size=max_bucket_size
-#             )
-#         except Exception as e:
-#             print("LSH UDF error:", type(e).__name__, e)
-#             return {"id1": [], "id2": []}
-
-#     pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
-#         lsh_pairs_map_batches_safe,
-#         batch_format="default",
-#         batch_size=cfg.lsh.batch_size,
-#         fn_kwargs={
-#             "k": cfg.lsh.k,
-#             "b": cfg.lsh.b,
-#             "max_bucket_size": cfg.lsh.max_bucket_size,
-#         },
-#     )
-
-#     pairs_out_dir = f"{out_dir}/pairs_v0001"
-#     pairs_ds.write_parquet(pairs_out_dir)
-#     print("wrote pairs:", pairs_out_dir)
-
-#     minihash_out_dir = f"{out_dir}/intermediate/minihash_v0001"
-#     minihash_ds = ray.data.read_parquet(minihash_out_dir)
-
-#     lsh_safe = make_lsh_safe_wrapper(max_pairs_per_bucket=cfg.lsh.max_pairs_per_bucket)
-
-#     pairs_ds = ds_minihash.select_columns(["id", "sig", "sig_ok"]).map_batches(
-#         lsh_safe,
-#         batch_format="default",
-#         batch_size=cfg.lsh.batch_size,
-#         fn_kwargs={
-#             "k": cfg.lsh.k,
-#             "b": cfg.lsh.b,
-#             "max_bucket_size": cfg.lsh.max_bucket_size,
-#         },
-#     )
-
-#     out_safe_pairs = os.path.join(out_dir, f"pairs_safe_{cfg.run.version}")
-#     pairs_ds.write_parquet(out_safe_pairs)
-
-#     print("wrote pairs:", out_pairs)
-#     print("pairs count:", pairs_ds.count())
-#     print("sample:", pairs_ds.take(5))
-
-#     # return
-#     # Cluster IDs (local union-find)
-#     id_to_cluster = build_id_to_cluster(pairs_ds)
-#     ds_with_cluster = ds_minihash.map(make_add_cluster_id(id_to_cluster))
-
-#     # # Snapshot dedup
-#     reps, used_key = dedup_snapshot(
-#         pairs_ds,
-#         mode=cfg.snapshot.mode,
-#         key_col=cfg.snapshot.key_col,
-#     )
-
-#     # # Keep only safe columns for writing
-#     keep_cols = ["dataset", "id", "instruction", "code_ref", "language", "has_code"]
-#     reps_out = reps.select_columns([c for c in keep_cols if c in reps.schema().names])
-
-#     # Write snapshot
-#     reps_out.write_parquet(out_dir)
-
-#     print("group_by:", used_key)
-#     print("wrote:", out_dir)
-#     print("sample:", reps_out.take(3))
+STAGE_DIRS = {
+    "canonicalize": "01_canonicalize",
+    "minhash": "02_minhash",
+    "pairs": "03_pairs",
+    "cluster_map": "04_cluster_map",
+    "snapshot": "05_snapshot",
+    "split": "06_split",
+}
 
 
-# if __name__ == "__main__":
-#     import argparse
+def set_up(out_root: str) -> dict[str, str]:
+    stage_paths = {k: os.path.join(out_root, v) for k, v in STAGE_DIRS.items()}
+    for p in stage_paths.values():
+        os.makedirs(p, exist_ok=True)
+    return stage_paths
 
-#     parser = argparse.ArgumentParser(
-#         description="Run the Ray data preprocessing pipeline."
-#     )
-#     parser.add_argument(
-#         "--config",
-#         type=str,
-#         default="./config/pipeline.yaml",
-#         help="Path to pipeline YAML config.",
-#     )
-#     parser.add_argument(
-#         "--input_dir",
-#         type=str,
-#         default=None,
-#         help="Path to pipeline YAML config.",
-#     )
-#     parser.add_argument(
-#         "--output_dir",
-#         type=str,
-#         default=None,
-#         help="Path to pipeline YAML config.",
-#     )
-#     args = parser.parse_args()
 
-#     data_preprocess(
-#         input_dir=args.input_dir, out_dir=args.output_dir, cfg_path=args.config
-#     )
+def get_will_run(cfg) -> set[str]:
+    """
+    Returns the set of stages to run this invocation.
+    Expects cfg.run.stages to be a list like ["canonicalize","minhash","lsh","snapshot"].
+    """
+    stages = getattr(cfg.run, "stages", None)
+    if not stages:
+        raise ValueError("cfg.run.stages is empty. Set run.stages in your YAML.")
+    if not isinstance(stages, (list, tuple)):
+        raise TypeError(
+            f"cfg.run.stages must be a list/tuple, got: {type(stages).__name__}"
+        )
+    return {str(s).strip() for s in stages if str(s).strip()}
+
+
+def run_or_load(stage: str, will_run: set[str], stage_paths: dict[str, str], run_fn):
+    """
+    stage: stage name like 'canonicalize'
+    will_run: set(cfg.run.stages)
+    stage_paths: dict of stage -> output dir
+    run_fn: callable that returns a Ray dataset (and should write inside)
+    """
+    if stage in will_run:
+        return run_fn()
+    else:
+        require_stage_output(stage, stage_paths[stage])
+        return ray.data.read_parquet(stage_paths[stage])
+
+
+def data_preprocess(cfg_path=r"configs\preprocess.yaml"):
+    cfg = load_pipeline_config(cfg_path)
+
+    # run stamp (P0.3)
+    ctx = start_run(
+        phase="preprocess",
+        config_path=cfg_path,
+        dataset_version_id=cfg.run.version,
+        extras={"stages": cfg.run.stages},
+    )
+    print("run_dir:", ctx.run_dir)
+
+    stage_paths = set_up(os.path.join(ctx.run_dir, "stages"))
+    preflight(cfg, stage_paths)
+
+    ray.init(**(cfg.run.ray_init_kwargs or {}))
+    will_run = get_will_run(cfg)
+
+    ds_canon = run_or_load(
+        "canonicalize",
+        will_run,
+        stage_paths,
+        lambda: run_stage_canonicalize(cfg, stage_paths),
+    )
+    write_done(
+        "canonicalize",
+        stage_paths["canonicalize"],
+        {"rows": ds_canon.count(), "run_id": ctx.run_id, "version": cfg.run.version},
+    )
+
+    ds_minihash = run_or_load(
+        "minhash",
+        will_run,
+        stage_paths,
+        lambda: run_stage_minhash(cfg, stage_paths, ds_canon=ds_canon),
+    )
+    write_done(
+        "minhash",
+        stage_paths["minhash"],
+        {"rows": ds_minihash.count(), "run_id": ctx.run_id, "version": cfg.run.version},
+    )
+
+    pairs_ds = run_or_load(
+        "pairs",
+        will_run,
+        stage_paths,
+        lambda: run_stage_lsh(cfg, stage_paths, ds_minihash=ds_minihash),
+    )
+    write_done(
+        "pairs",
+        stage_paths["pairs"],
+        {"rows": pairs_ds.count(), "run_id": ctx.run_id, "version": cfg.run.version},
+    )
+
+    ds_cluster_map = run_or_load(
+        "cluster_map",
+        will_run,
+        stage_paths,
+        lambda: run_stage_cluster_map(cfg, stage_paths, pairs_ds=pairs_ds),
+    )
+    write_done(
+        "cluster_map",
+        stage_paths["cluster_map"],
+        {
+            "rows": ds_cluster_map.count(),
+            "run_id": ctx.run_id,
+            "version": cfg.run.version,
+        },
+    )
+
+    snapshot_ds = run_or_load(
+        "snapshot",
+        will_run,
+        stage_paths,
+        lambda: run_stage_snapshot(
+            cfg, stage_paths, ds_minihash=ds_minihash, ds_cluster_map=ds_cluster_map
+        ),
+    )
+    write_done(
+        "snapshot",
+        stage_paths["snapshot"],
+        {"rows": snapshot_ds.count(), "run_id": ctx.run_id, "version": cfg.run.version},
+    )
+
+    run_or_load(
+        "split",
+        will_run,
+        stage_paths,
+        lambda: run_stage_split(cfg, stage_paths, snapshot_ds=snapshot_ds),
+    )
+    write_done(
+        "split",
+        stage_paths["split"],
+        {"run_id": ctx.run_id, "version": cfg.run.version},
+    )
+
+    write_done(
+        "preprocess_run",
+        ctx.run_dir,
+        {"run_id": ctx.run_id, "version": cfg.run.version, "stages": list(will_run)},
+    )
+
+    reports_dir = os.path.join(ctx.run_dir, "reports")
+    run_data_quality_report(cfg, stage_paths, reports_dir)
+    write_done(
+        "data_quality", reports_dir, {"run_id": ctx.run_id, "version": cfg.run.version}
+    )
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Run the Ray data preprocessing pipeline."
+    )
+    parser.add_argument("--config", type=str, default=r"configs\preprocess.yaml")
+    args = parser.parse_args()
+
+    data_preprocess(cfg_path=args.config)

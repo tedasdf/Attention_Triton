@@ -62,6 +62,29 @@ def make_add_minhash(cfg: MinHashConfig):
     return add_minhash
 
 
+def run_stage_minhash(cfg, stage_paths: dict[str, str], ds_canon=None):
+    """
+    If ds_canon is provided (from same run), use it.
+    Otherwise read canonicalize output from disk.
+    """
+    if ds_canon is None:
+        ds_canon = ray.data.read_parquet(stage_paths["canonicalize"])
+        if getattr(cfg.run, "debug", False):
+            ds_canon = ds_canon.limit(getattr(cfg.run, "debug_max_rows", 2000))
+
+    # (canonicalize stage already filtered parse_ok, but safe to keep this)
+    ds_canon = ds_canon.filter(lambda r: r.get("parse_ok", False))
+
+    ds_sig = ds_canon.map(make_add_minhash(cfg.minhash))
+    ds_minihash = ds_sig.filter(lambda r: r.get("sig_ok", False))
+
+    out_dir = stage_paths["minhash"]
+    ds_minihash.write_parquet(out_dir)
+    print("wrote minhash:", out_dir, "| rows:", ds_minihash.count())
+
+    return ds_minihash
+
+
 if __name__ == "__main__":
     import ray
 

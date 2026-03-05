@@ -1,0 +1,63 @@
+run:
+  debug: true
+  debug_max_rows: 2000
+  version: "v0001"
+  ray_init_kwargs: {}   # e.g. {"num_cpus": 8, "object_store_memory": 2000000000}
+  stages: ["canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot", ""] # "canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot"]  # optional override
+  input_dir: "artifacts/processed_datasets/unified_python"
+  output_dir: "artifacts/runs/preprocess"
+
+canonicalize:
+  representation: "node_types"   # node_types | dump
+  traversal: "preorder"          # preorder | postorder | bfs
+  on_parse_error: "skip"         # skip | fallback
+  max_code_chars: 200000
+  remove_docstrings: true
+  rename_locals: true
+  rename_args: true
+  rename_function_names: false
+  rename_class_names: false
+  normalize_literals: "basic"    # none | basic | aggressive
+  keep_builtins: true
+
+minhash:
+  shingle_n: 5
+  num_perm: 128
+  seed0: 1337
+
+pairs:
+  batch_size: 512
+  k: 128
+  b: 32
+  max_bucket_size: 2000
+  max_pairs_per_bucket: 2000
+
+cluster:
+  pairs_batch_rows: 200000   # reduce if driver RAM tight
+  map_write_rows: 1000000   # rows per parquet write chunk
+
+
+snapshot:
+  mode: "cluster"                # exact | cluster
+  key_col: null                  # override key if you want, else null
+  snapshot_keep_cols:
+    - dataset
+    - id
+    - instruction
+    - code_ref
+    - language
+    - has_code
+    - cluster_id
+
+cleanup:
+  enabled: true
+  keep: ["01_canonicalize", "02_minhash", "05_snapshot"]  # keep these
+  delete_if_success: ["03_pairs", "04_cluster_map"]       # delete these if snapshot done
+
+split:
+  enabled: true
+  train: 0.90
+  val: 0.05
+  test: 0.05
+  key: "cluster_id"
+  seed: 1337   # optional if you hash, but nice for docs

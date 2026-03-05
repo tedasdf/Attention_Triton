@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 import io
 import tokenize
+import ray
 
 _BUILTINS = set(dir(builtins))
 
@@ -253,6 +254,46 @@ def canonicalize(code: str, cfg: CanonicalizerConfig) -> CanonResult:
             rep=[] if cfg.representation == "node_types" else "",
             err=f"{type(e).__name__}:{e}",
         )
+
+
+def run_stage_canonicalize(cfg, stage_paths: dict[str, str]):
+    ds = ray.data.read_parquet(cfg.run.input_dir)
+
+    if getattr(cfg.run, "debug", False):
+        ds = ds.limit(getattr(cfg.run, "debug_max_rows", 2000))
+
+    def add_canon(row):
+        # skip non-python/no-code
+        if row.get("language") != "python" or not row.get("has_code"):
+            row["parse_ok"] = False
+            row["parse_err"] = "not_python_or_no_code"
+            # keep representation column consistent
+            if cfg.canonicalize.representation == "dump":
+                row["canon_dump"] = ""
+            else:
+                row["node_types"] = []
+            return row
+
+        res = canonicalize(row.get("code_ref", "") or "", cfg.canonicalize)
+        row["parse_ok"] = res.ok
+        row["parse_err"] = res.err
+
+        if cfg.canonicalize.representation == "dump":
+            row["canon_dump"] = res.rep if res.ok else ""
+        else:
+            row["node_types"] = res.rep if res.ok else []
+
+        return row
+
+    ds2 = ds.map(add_canon)
+    # If you want downstream stages to only see parse_ok rows:
+    ds_canon = ds2.filter(lambda r: r.get("parse_ok", False))
+
+    out_dir = stage_paths["canonicalize"]
+    ds_canon.write_parquet(out_dir)
+    print("wrote canonicalize:", out_dir, "| rows:", ds_canon.count())
+
+    return ds_canon
 
 
 if __name__ == "__main__":

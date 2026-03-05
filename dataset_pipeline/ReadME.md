@@ -1,60 +1,155 @@
-Deliverable 1: One Ray pipeline script
-Suggested file layout
-dataset_pipeline/
-  pipeline.py              # main entry (Ray Data)
-  stages/
-    normalize.py
-    canonicalize.py
-    minhash.py
-    lsh.py
-    quality.py
-    snapshot.py
-    split.py
-  config/
-    pipeline.yaml
-  utils/
-    io.py
-    hashing.py
-    logging.py
-Required outputs
+# Dataset Schema & Pipeline Outputs (Preprocess)
 
-snapshot parquet shards
+This document defines the schema contracts for each preprocessing stage and the final snapshot dataset.
 
-split parquet shards
+## Overview
 
-manifests (jsonl) for snapshot + each split
+Pipeline stages (in order):
 
-run metadata:
+1. `canonicalize`  → `01_canonicalize/`
+2. `minhash`       → `02_minhash/`
+3. `pairs`         → `03_pairs/`
+4. `cluster_map`   → `04_cluster_map/`
+5. `snapshot`      → `05_snapshot/` (final deduplicated dataset)
 
-run_info.json (git commit, dvc remote, timestamp, ray version, params)
+Each stage reads Parquet and writes Parquet.
 
-Deliverable 2: Versioning + DVC publish script
-What it should do
+---
 
-Compute a new snapshot_id (v0001, v0002, …)
+## Raw Input Dataset (Required)
 
-Run the pipeline (or verify pipeline already ran)
+**Location:** `run.input_dir`  
+**Format:** Parquet
 
-dvc add the output directories:
+### Required columns
+| Column | Type | Description |
+|---|---|---|
+| `id` | string | Unique example identifier |
+| `dataset` | string | Source dataset name (if available) |
+| `language` | string | Language label, e.g. `"python"` |
+| `has_code` | bool | Whether `code_ref` contains code |
+| `instruction` | string | Instruction / prompt text |
+| `code_ref` | string | Code snippet / completion |
 
-snapshots/unified_python/vX
+### Optional columns (pass-through)
+Any additional metadata columns are allowed and may be passed through stages.
 
-splits/unified_python/vX
+---
 
-git add the generated .dvc files (or updated dvc.yaml/dvc.lock)
+## Stage 01 — Canonicalize (`01_canonicalize/`)
 
-dvc push -r mys3remote
+**Purpose:** Parse Python code and produce a canonical representation for similarity detection.
 
-git commit and push to GitHub
+### Output columns (adds)
+| Column | Type | Description |
+|---|---|---|
+| `parse_ok` | bool | Whether parsing/canonicalization succeeded |
+| `parse_err` | string or null | Failure reason |
+| `node_types` | list[string] | Canonical AST node-type sequence (when `representation: node_types`) |
+| `canon_dump` | string | Canonical AST dump (when `representation: dump`) |
 
-Tag the commit:
+### Notes
+- Non-Python or rows with `has_code=false` are marked `parse_ok=false`.
+- Downstream stages typically filter to `parse_ok=true`.
 
-git tag dataset-v0001 (optional)
+---
 
-Git ignore policy
+## Stage 02 — MinHash (`02_minhash/`)
 
-keep big data out of Git:
+**Purpose:** Compute MinHash signatures from canonical representation (currently node_types shingles).
 
-ignore snapshots/**, splits/** (except manifests if you want them in Git)
+### Output columns (adds)
+| Column | Type | Description |
+|---|---|---|
+| `sig_ok` | bool | Whether a valid signature was computed |
+| `sig` | list[int] | MinHash signature length `k` |
 
-track via DVC.
+### Notes
+- Uses shingles of length `shingle_n`.
+- Rows with `parse_ok=false` or too-short `node_types` are `sig_ok=false`.
+
+---
+
+## Stage 03 — Pairs (`03_pairs/`)
+
+**Purpose:** Generate candidate near-duplicate pairs using LSH banding.
+
+### Output schema
+| Column | Type | Description |
+|---|---|---|
+| `id1` | string | Example id (endpoint A) |
+| `id2` | string | Example id (endpoint B) |
+
+### Notes
+- Buckets are capped by `max_bucket_size`.
+- Pair generation per bucket is capped by `max_pairs_per_bucket` (deterministic order).
+
+---
+
+## Stage 04 — Cluster Map (`04_cluster_map/`)
+
+**Purpose:** Build connected components (clusters) over candidate pairs.
+
+### Output schema
+| Column | Type | Description |
+|---|---|---|
+| `id` | string | Example id appearing in at least one pair |
+| `cluster_id` | string | Stable cluster identifier |
+
+### Notes
+- `cluster_id` stability: computed as `md5(min_id_in_component)` (stable across runs).
+- IDs that never appear in any pair will not be present in `cluster_map` (handled in snapshot via singleton fill).
+
+---
+
+## Stage 05 — Snapshot (Final) (`05_snapshot/`)
+
+**Purpose:** Produce a deduplicated snapshot of the dataset.
+
+### Output columns (default keep set)
+| Column | Type | Description |
+|---|---|---|
+| `dataset` | string | Source dataset |
+| `id` | string | Unique id |
+| `instruction` | string | Instruction text |
+| `code_ref` | string | Code |
+| `language` | string | Language |
+| `has_code` | bool | Has code |
+| `cluster_id` | string | Cluster id (singleton-filled) |
+
+### Dedup rule
+- Group key: `cluster_id` (cluster mode)
+- Representative selection (deterministic):
+  1. longest `code_ref`
+  2. then longest `instruction`
+  3. then smallest `md5(id)`
+
+### Singleton handling
+If `cluster_id` is missing after join, it is filled as:
+- `cluster_id = md5(id)`
+
+---
+
+## Configuration References
+
+Key config sections:
+- `canonicalize`: canonicalization knobs
+- `minhash`: `shingle_n`, `num_perm`, `seed0`
+- `pairs`: `k`, `b`, `max_bucket_size`, `max_pairs_per_bucket`
+- `snapshot`: `mode`, `key_col`, `snapshot_keep_cols` (if configured)
+
+---
+
+## Invariants & Guarantees
+
+- All outputs are Parquet.
+- IDs are treated as strings.
+- Representative selection is deterministic.
+- No stage requires materializing entire datasets on the driver (`take_all()` is avoided).
+
+---
+
+## Known Limitations
+
+- Windows Ray may have logging/iterator stability issues; Linux/WSL recommended for large runs.
+- Very large candidate pair graphs may still stress driver memory during Union-Find; tune LSH caps accordingly.

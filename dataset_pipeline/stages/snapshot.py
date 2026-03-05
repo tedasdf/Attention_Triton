@@ -1,26 +1,17 @@
-import hashlib
+import os
+import ray
+import pandas as pd
+from .utils import _stable_md5
+
 from dataclasses import dataclass
 from typing import Literal
-import pandas as pd
-
-import ray
-
-# ----------------- hyperparams / config -----------------
 
 
 @dataclass
 class DedupConfig:
-    mode: Literal["exact", "cluster"] = (
-        "cluster"  # "exact" needs canon_hash; "cluster" needs cluster_id
-    )
+    mode: Literal["exact", "cluster"] = "cluster"
     key_col: str | None = None  # override grouping key if you want
-
-
-# ----------------- helpers (same as before) -----------------
-
-
-def _stable_md5(s: str) -> str:
-    return hashlib.md5(s.encode("utf-8", "ignore")).hexdigest()
+    snapshot_keep_cols: list[str] | None = None
 
 
 def dedup_snapshot(ds, mode: str, key_col: str | None = None):
@@ -34,59 +25,108 @@ def dedup_snapshot(ds, mode: str, key_col: str | None = None):
     ds_k = ds.filter(lambda r: bool(r.get(key_col)))
 
     def pick_best_group(pdf: "pd.DataFrame") -> "pd.DataFrame":
-        # Deterministic representative choice (no quality scoring):
+        # Deterministic representative choice:
         # 1) longest code_ref
         # 2) then longest instruction
         # 3) then smallest md5(id)
-        code_len = pdf["code_ref"].fillna("").str.len()
-        instr_len = pdf["instruction"].fillna("").str.len()
-        id_hash = pdf["id"].fillna("").map(_stable_md5)
+        code_len = (
+            pdf.get("code_ref", pd.Series([""] * len(pdf)))
+            .fillna("")
+            .astype(str)
+            .str.len()
+        )
+        instr_len = (
+            pdf.get("instruction", pd.Series([""] * len(pdf)))
+            .fillna("")
+            .astype(str)
+            .str.len()
+        )
+        id_hash = (
+            pdf.get("id", pd.Series([""] * len(pdf)))
+            .fillna("")
+            .astype(str)
+            .map(_stable_md5)
+        )
 
         pdf = pdf.assign(_code_len=code_len, _instr_len=instr_len, _id_hash=id_hash)
         pdf = pdf.sort_values(
             by=["_code_len", "_instr_len", "_id_hash"],
             ascending=[False, False, True],
-            kind="mergesort",  # stable
+            kind="mergesort",
         )
-        # return single-row dataframe
         return pdf.head(1).drop(columns=["_code_len", "_instr_len", "_id_hash"])
 
     reps = ds_k.groupby(key_col).map_groups(pick_best_group, batch_format="pandas")
     return reps, key_col
 
 
-# ----------------- main -----------------
+def run_stage_snapshot(
+    cfg, stage_paths: dict[str, str], ds_minihash=None, ds_cluster_map=None
+):
+    """
+    Inputs:
+      - stage_paths["minhash"]      (02_minhash/)
+      - stage_paths["cluster_map"]  (04_cluster_map/)
+    Output:
+      - stage_paths["snapshot"]     (05_snapshot/)
+    """
 
-if __name__ == "__main__":
-    ray.init()
+    if ds_minihash is None:
+        ds_minihash = ray.data.read_parquet(stage_paths["minhash"])
+        if getattr(cfg.run, "debug", False):
+            ds_minihash = ds_minihash.limit(getattr(cfg.run, "debug_max_rows", 2000))
 
-    input_dir = "intermediate/clustered_v0001"  # <-- uses your previous parquet output
-    output_dir = "intermediate/snapshots_v0001"
+    if ds_cluster_map is None:
+        ds_cluster_map = ray.data.read_parquet(
+            stage_paths["cluster_map"]
+        )  # id, cluster_id
+        if getattr(cfg.run, "debug", False):
+            ds_cluster_map = ds_cluster_map.limit(
+                getattr(cfg.run, "debug_max_rows", 2000)
+            )
 
-    cfg = DedupConfig(
-        mode="cluster",
-        key_col=None,
+    ds_with_cluster = ds_minihash.join(
+        ds_cluster_map,
+        on=("id",),
+        join_type="left_outer",
+        num_partitions=200,  # tune: 50–500 depending on dataset size
     )
 
-    ds_in = ray.data.read_parquet(input_dir)
+    def fill_singletons(row):
+        if not row.get("cluster_id"):
+            row["cluster_id"] = _stable_md5(str(row["id"]))
+        return row
 
-    reps, used_key = dedup_snapshot(ds_in, mode=cfg.mode, key_col=cfg.key_col)
+    ds_with_cluster = ds_with_cluster.map(fill_singletons)
 
-    keep_cols = ["dataset", "id", "instruction", "code_ref", "language", "has_code"]
+    reps, used_key = dedup_snapshot(
+        ds_with_cluster,
+        mode=cfg.snapshot.mode,
+        key_col=cfg.snapshot.key_col,
+    )
 
-    # keep cluster_id if you're doing cluster mode
-    if cfg.mode == "cluster" and "cluster_id" in reps.schema().names:
-        keep_cols.append("cluster_id")
+    default_keep = [
+        "dataset",
+        "id",
+        "instruction",
+        "code_ref",
+        "language",
+        "has_code",
+        "cluster_id",
+    ]
+    keep_cols = default_keep
+    cols = reps.columns()  # Ray will try to fetch schema
+    if not cols:
+        # fallback: sample one row if dataset non-empty
+        sample = reps.take(1)
+        cols = list(sample[0].keys()) if sample else []
 
-    # keep canon_hash if you're doing exact mode
-    if cfg.mode == "exact" and "canon_hash" in reps.schema().names:
-        keep_cols.append("canon_hash")
+    reps_out = reps.select_columns([c for c in keep_cols if c in cols])
 
-    reps_out = reps.select_columns(keep_cols)
+    snapshot_dir = stage_paths["snapshot"]
+    os.makedirs(snapshot_dir, exist_ok=True)
+    reps_out.write_parquet(snapshot_dir)
 
-    reps_out.repartition(1).write_parquet(output_dir)
+    print("wrote pairs:", snapshot_dir, "| rows:", reps_out.count())
 
-    print("input:", input_dir)
-    print("mode:", cfg.mode, "| group_by:", used_key)
-    print("wrote:", output_dir)
-    print("sample:", reps.take(3))
+    return reps_out
