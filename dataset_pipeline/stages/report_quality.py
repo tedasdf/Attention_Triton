@@ -21,6 +21,7 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
         "parse_errors_top10": [],
         "cluster_top20": [],
         "length_stats": {},
+        "samples": {},
     }
 
     # ---- counts ----
@@ -42,6 +43,23 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
     report["counts"]["cluster_map_ids"] = cluster_map_ds.count()
 
     snap_ds = ray.data.read_parquet(stage_paths["snapshot"])
+
+    # ---- sample examples ----
+    sample_rows = snap_ds.take(5)
+
+    clean_samples = []
+    for r in sample_rows:
+        clean_samples.append(
+            {
+                "id": r.get("id"),
+                "instruction": (r.get("instruction") or "")[:200],
+                "code_ref": (r.get("code_ref") or "")[:200],
+                "cluster_id": r.get("cluster_id"),
+            }
+        )
+
+    report["samples"]["snapshot_examples"] = clean_samples
+
     snap_count = snap_ds.count()
     report["counts"]["snapshot"] = snap_count
 
@@ -66,7 +84,6 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
         report["cluster_top20"] = top20
 
         # quick summary stats (cheap-ish)
-        # (If you want percentiles, you can compute in pandas later.)
         top1 = top20[0]["count()"] if top20 else 0
         report["length_stats"]["largest_cluster_size"] = top1
 
@@ -124,6 +141,13 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
         f.write("\n## Top clusters\n")
         for r in report["cluster_top20"]:
             f.write(f"- {r.get('cluster_id')}: {r.get('count()')}\n")
+        f.write("\n## Sample rows\n")
+
+        for s in report["samples"].get("snapshot_examples", []):
+            f.write(f"\n### id: {s['id']}\n")
+            f.write(f"cluster: {s['cluster_id']}\n")
+            f.write(f"instruction:\n```\n{s['instruction']}\n```\n")
+            f.write(f"code:\n```\n{s['code_ref']}\n```\n")
 
     print("wrote:", json_path)
     print("wrote:", md_path)
