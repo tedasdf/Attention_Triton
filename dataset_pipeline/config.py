@@ -28,7 +28,7 @@ class SplitConfig:
     val: float
     test: float
     key: str
-    hash: str
+    seed: int
 
 
 @dataclass
