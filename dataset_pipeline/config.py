@@ -18,6 +18,7 @@ class RunConfig:
     stages: Optional[list[str]] = None
     input_dir: Optional[str] = None
     output_dir: str = "artifacts/run/preprocess/"
+    debug_max_rows: int = 2000
 
 
 @dataclass
