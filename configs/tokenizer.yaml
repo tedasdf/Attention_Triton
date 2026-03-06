@@ -5,3 +5,5 @@ tokenizer:
   source_dir: "artifacts/preprocess/v0001/05_snapshot"
   text_fields: ["instruction", "code_ref"]
   output_dir: "artifacts/tokenizer/"
+  batch_size: 4096
+  debug: True

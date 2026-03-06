@@ -25,7 +25,7 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
     }
 
     # ---- counts ----
-    # Raw input (can be expensive; in debug mode you can skip)
+    # Raw input (can be expensive; in debug mode can skip)
     raw_ds = ray.data.read_parquet(cfg.run.input_dir)
     raw_count = raw_ds.count()
     report["counts"]["raw"] = raw_count
@@ -83,7 +83,7 @@ def run_data_quality_report(cfg, stage_paths: dict[str, str], out_dir: str):
         top20 = cluster_sizes.sort("count()", descending=True).take(20)
         report["cluster_top20"] = top20
 
-        # quick summary stats (cheap-ish)
+        # quick summary stats
         top1 = top20[0]["count()"] if top20 else 0
         report["length_stats"]["largest_cluster_size"] = top1
 

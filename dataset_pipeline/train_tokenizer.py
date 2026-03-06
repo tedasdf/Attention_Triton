@@ -9,17 +9,68 @@ from tokenizers import models, trainers, pre_tokenizers, decoders
 
 from utils.run_context import start_run
 
+import hashlib
 
-def iter_training_text(snapshot_dir: str, fields: list[str], batch_size: int = 4096):
+
+def md5_int_list(xs):
+    b = ",".join(map(str, xs)).encode("utf-8")
+    return hashlib.md5(b).hexdigest()
+
+
+def write_tokenizer_sanity_suite(
+    tokenizer,
+    text_iter,
+    out_dir: str,
+    n_samples: int = 50,
+    head_n: int = 64,
+):
+    os.makedirs(out_dir, exist_ok=True)
+
+    tests = []
+    for text in text_iter:
+        enc = tokenizer.encode(text)
+        ids = enc.ids
+        tests.append(
+            {
+                "text": text,
+                "ids_len": len(ids),
+                "ids_head": ids[:head_n],
+                "ids_md5": md5_int_list(ids),
+            }
+        )
+        if len(tests) >= n_samples:
+            break
+
+    path = os.path.join(out_dir, "smoke_test.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "n_samples": n_samples,
+                "head_n": head_n,
+                "tests": tests,
+            },
+            f,
+            indent=2,
+        )
+
+    print("wrote tokenizer sanity suite:", path)
+    return path
+
+
+def iter_training_text(
+    snapshot_dir: str, fields: list[str], batch_size: int = 4096, debug: bool = False
+):
     ds = ray.data.read_parquet(snapshot_dir)
 
     for batch in ds.iter_batches(batch_size=batch_size, batch_format="pyarrow"):
-        # batch is a pyarrow.Table
         cols = {
             f: batch[f].to_pylist() if f in batch.column_names else None for f in fields
         }
 
         n = batch.num_rows
+        if debug:
+            n = min(10, n)
+
         for i in range(n):
             parts = []
             for f in fields:
@@ -90,7 +141,10 @@ if __name__ == "__main__":
     fields = tok_cfg.get("text_fields", ["instruction", "code_ref"])
     vocab_size = int(tok_cfg.get("vocab_size", 32000))
     version = tok_cfg.get("version", "tok_v0001")
-    out_dir = tok_cfg.get("output_dir", os.path.join("artifacts", "tokenizer", version))
+    batch_size = int(tok_cfg.get("batch_size", 4096))
+    debug = bool(tok_cfg.get("debug", False))
+    out_root = tok_cfg.get("output_dir", os.path.join("artifacts", "tokenizer"))
+    out_dir = os.path.join(out_root, version)
 
     special_tokens = tok_cfg.get("special_tokens", ["<pad>", "<eos>", "<unk>"])
     unk_token = "<unk>"  # keep consistent with special_tokens
@@ -111,7 +165,9 @@ if __name__ == "__main__":
     # init ray once
     ray.init(**(tok_cfg.get("ray_init_kwargs", {}) or {}))
 
-    text_iter = iter_training_text(snapshot_dir, fields)
+    text_iter = iter_training_text(
+        snapshot_dir, fields, batch_size=batch_size, debug=debug
+    )
     tokenizer = train_tokenizer(
         text_iter,
         vocab_size=vocab_size,
@@ -132,3 +188,13 @@ if __name__ == "__main__":
     tok_path = write_bundle(tokenizer, out_dir, manifest)
     print("wrote tokenizer bundle:", out_dir)
     print("tokenizer file:", tok_path)
+
+    write_tokenizer_sanity_suite(
+        tokenizer=tokenizer,
+        text_iter=iter_training_text(
+            snapshot_dir, fields, batch_size=4096, debug=False
+        ),
+        out_dir=out_dir,
+        n_samples=50,
+        head_n=64,
+    )

@@ -24,7 +24,7 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-          git clean -fd
+          git clean -fd -e artifacts/
         
       - name: Link Heavy Storage
         run: |
