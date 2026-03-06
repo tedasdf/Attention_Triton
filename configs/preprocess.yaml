@@ -3,7 +3,7 @@ run:
   debug_max_rows: 2000
   version: "v0001"
   ray_init_kwargs: {}   # e.g. {"num_cpus": 8, "object_store_memory": 2000000000}
-  stages: ["canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot", ""] # "canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot"]  # optional override
+  stages: ["canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot", "split"] # "canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot"]  # optional override
   input_dir: "artifacts/processed_datasets/unified_python"
   output_dir: "artifacts/runs/preprocess"
 
