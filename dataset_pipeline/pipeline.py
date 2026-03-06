@@ -59,7 +59,7 @@ def run_or_load(stage: str, will_run: set[str], stage_paths: dict[str, str], run
         return ray.data.read_parquet(stage_paths[stage])
 
 
-def data_preprocess(cfg_path=r"configs\preprocess.yaml"):
+def data_preprocess(cfg_path=r"configs/preprocess.yaml"):
     cfg = load_pipeline_config(cfg_path)
 
     # run stamp (P0.3)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run the Ray data preprocessing pipeline."
     )
-    parser.add_argument("--config", type=str, default=r"configs\preprocess.yaml")
+    parser.add_argument("--config", type=str, default=r"configs/preprocess.yaml")
     args = parser.parse_args()
 
     data_preprocess(cfg_path=args.config)
