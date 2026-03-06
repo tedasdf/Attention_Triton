@@ -23,6 +23,7 @@ class RunConfig:
 
 @dataclass
 class SplitConfig:
+    enabled: bool
     train: float
     val: float
     test: float
