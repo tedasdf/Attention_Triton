@@ -8,7 +8,7 @@ from .data_utils import require_stage_output, preflight, write_done
 from .stages.canonicalize import run_stage_canonicalize
 from .stages.minihash import run_stage_minhash
 from .stages.pairs import run_stage_lsh
-from stages.split import run_stage_split
+from .stages.split import run_stage_split
 
 from .config import load_pipeline_config
 from utils.run_context import start_run
