@@ -2,6 +2,7 @@ version: "3"
 
 vars:
   CONFIG_PREPROCESS: "configs/preprocess.yaml"
+  CONFIG_TOKENIZER: "config/tokenizer.yaml"
   CONFIG_TRAIN: "configs/train.yaml"
   CONFIG_EVAL: "configs/eval.yaml"
   CONFIG_SERVE: "configs/serve.yaml"
@@ -17,6 +18,13 @@ tasks:
     cmds:
       - echo "==> Preprocess using config:{{.CONFIG_PREPROCESS}}"
       - python dataset_pipeline/pipeline.py --config "{{.CONFIG_PREPROCESS}}"
+
+  tokenizer:
+    desc: "Run tokenizer (config-driven)"
+    cmds:
+      - echo "==> Preprocess using config:{{.CONFIG_TOKENIZER}}"
+      - python dataset_pipeline/pipeline.py --config "{{.CONFIG_PREPROCESS}}"
+
 
   train:
     desc: "Run training (config-driven)"
