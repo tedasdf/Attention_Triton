@@ -1,5 +1,5 @@
 run:
-  debug: true
+  debug: false
   debug_max_rows: 2000
   version: "v0001"
   ray_init_kwargs: {}   # e.g. {"num_cpus": 8, "object_store_memory": 2000000000}

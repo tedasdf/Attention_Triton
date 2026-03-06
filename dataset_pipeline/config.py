@@ -12,6 +12,7 @@ from .stages.pairs import LSHConfig
 
 @dataclass
 class RunConfig:
+    debug: bool = False
     version: str = "v0001"
     ray_init_kwargs: Optional[dict[str, Any]] = None
     stages: Optional[list[str]] = None
