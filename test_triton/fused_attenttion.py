@@ -230,7 +230,7 @@ def test_dense_attention(
     seq_len,
     dim,
     num_heads=1,
-    is_causal: bool = False,
+    is_causal: bool = True,
     dtype=torch.float16,
     rtol: float = 1e-2,
     atol: float = 1e-2,
@@ -264,23 +264,16 @@ def benchmark():
 
 
 if __name__ == "__main__":
-    test_dense_attention(1, 128, 64, 10)
-    test_dense_attention(10, 256, 64, 2)
+    for dim in [4, 8, 16, 32, 64, 128]:
+        try:
+            test_dense_attention(2, 8, dim, 8, dtype=torch.float32)
+            print(dim, "fp32 pass")
+        except Exception as e:
+            print(dim, "fp32 fail", e)
 
-    test_dense_attention(2, 8, 128, 4)
-    test_dense_attention(5, 16, 256, 6)
-    test_dense_attention(1, 128, 64, 5)
-
-    # for dim in [4, 8, 16, 32, 64, 128]:
-    #     try:
-    #         test_dense_attention(2, 8, dim, 8, dtype=torch.float32)
-    #         print(dim, "fp32 pass")
-    #     except Exception as e:
-    #         print(dim, "fp32 fail", e)
-
-    # for dim in [4, 8, 16, 32, 64, 128]:
-    #     try:
-    #         test_dense_attention(2, 8, dim, 8, dtype=torch.float16)
-    #         print(dim, "fp16 pass")
-    #     except Exception as e:
-    #         print(dim, "fp16 fail", e)
+    for dim in [4, 8, 16, 32, 64, 128]:
+        try:
+            test_dense_attention(2, 8, dim, 8, dtype=torch.float16)
+            print(dim, "fp16 pass")
+        except Exception as e:
+            print(dim, "fp16 fail", e)
