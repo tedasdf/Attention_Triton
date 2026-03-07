@@ -10,7 +10,40 @@ DEVICE = torch.device(f"cuda:{torch.cuda.current_device()}")
 @triton.autotune(
     configs=[
         triton.Config(
+            {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 32}, num_warps=2, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 64}, num_warps=2, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 32}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 64}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
             {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 64}, num_warps=4, num_stages=2
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 128}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 32}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 64}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 64}, num_warps=8, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128}, num_warps=8, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 128}, num_warps=4, num_stages=1
+        ),
+        triton.Config(
+            {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 32}, num_warps=8, num_stages=1
         ),
     ],
     key=["seq_len", "dim"],
@@ -265,8 +298,61 @@ def test_dense_attention(
     print("DONE YIPPY")
 
 
-def benchmark():
-    raise ValueError
+configs = []
+for mode in ["fwd"]:
+    configs.append(
+        triton.testing.Benchmark(
+            x_names=["seq_len"],
+            x_vals=[128 * i for i in range(1, 17)],
+            line_arg="provider",
+            line_vals=["torch", "triton"],
+            line_names=[
+                "torch.nn.functional.scaled_dot_product_attention",
+                "Triton fused attention",
+            ],
+            styles=[("red", "-"), ("blue", "-")],
+            ylabel="ms",
+            plot_name=f"attention-performance-{mode}",
+            args={"mode": mode},
+        )
+    )
+
+
+@triton.testing.perf_report(configs)
+def benchmark(seq_len, provider, mode):
+    batch = 2
+    num_heads = 8
+    dim = 64
+    dtype = torch.float16
+    is_causal = False
+
+    q = torch.randn((batch, num_heads, seq_len, dim), device=DEVICE, dtype=dtype)
+    k = torch.randn((batch, num_heads, seq_len, dim), device=DEVICE, dtype=dtype)
+    v = torch.randn((batch, num_heads, seq_len, dim), device=DEVICE, dtype=dtype)
+
+    quantiles = [0.5, 0.05, 0.95]
+
+    if provider == "torch":
+        ms, min_ms, max_ms = triton.testing.do_bench(
+            lambda: F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                attn_mask=None,
+                dropout_p=0.0,
+                is_causal=is_causal,
+            ),
+            quantiles=quantiles,
+        )
+    elif provider == "triton":
+        ms, min_ms, max_ms = triton.testing.do_bench(
+            lambda: triton_fused_attention(q, k, v, is_causal=is_causal),
+            quantiles=quantiles,
+        )
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+    return ms, min_ms, max_ms
 
 
 if __name__ == "__main__":
@@ -283,3 +369,5 @@ if __name__ == "__main__":
             print(dim, "fp16 pass")
         except Exception as e:
             print(dim, "fp16 fail", e)
+
+    benchmark.run(show_plots=True, print_data=True)
