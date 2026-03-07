@@ -207,7 +207,7 @@ def triton_fused_attention(Q, K, V):
         Output.stride(3),
         BLOCK_SIZE_M=BLOCK_SIZE_M,
         BLOCK_SIZE_N=64,
-        BLOCK_DMODEL=dim,
+        BLOCK_DMODEL=max(dim, 16),
         num_warps=4,
         num_stages=2,
     )
