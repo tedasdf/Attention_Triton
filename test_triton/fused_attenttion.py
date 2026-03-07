@@ -88,7 +88,7 @@ def _kernel_fused_attention(
         offsets_v = offset_vb + offset_vh + offset_vs[:, None] + offset_vd[None, :]
         mask_v = ((start_n + n_idx)[:, None] < seq_len) & (d_idx[None, :] < dim)
 
-        v_val = tl.load(v_ptr + offsets_v, mask=mask_v, other=0.0)
+        v_val = tl.load(v_ptr + offsets_v, mask=mask_v, other=0.0).to(tl.float32)
         # find attention score
         S_ij = tl.dot(q_val, k_val) * qk_scale
 
