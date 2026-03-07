@@ -104,10 +104,13 @@ def _kernel_fused_attention(
         # find maximum
         m_new = tl.maximum(m_i, m_hat_ij)
 
-        l_new_i = tl.exp(m_i - m_new) * l_i + tl.exp(m_hat_ij - m_new) * l_hat_i
-        acc = tl.exp(m_i - m_new)[:, None] * acc + tl.exp(m_hat_ij - m_new)[
-            :, None
-        ] * tl.dot(P_ij, v_val, out_dtype=tl.float32)
+        scale_old = tl.exp(m_i - m_new).to(tl.float32)
+        scale_new = tl.exp(m_hat_ij - m_new).to(tl.float32)
+
+        l_new_i = scale_old[:, None] * l_i + scale_new[:, None] * l_hat_i
+        acc = scale_old[:, None] * acc + scale_new[:, None] * tl.dot(
+            P_ij, v_val, out_dtype=tl.float32
+        )
         # update
         m_i = m_new
         l_i = l_new_i
