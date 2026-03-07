@@ -7,6 +7,14 @@ import triton.language as tl
 DEVICE = torch.device(f"cuda:{torch.cuda.current_device()}")
 
 
+@triton.autotune(
+    configs=[
+        triton.Config(
+            {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 64}, num_warps=4, num_stages=2
+        ),
+    ],
+    key=["seq_len", "dim"],
+)
 @triton.jit
 def _kernel_fused_attention(
     q_ptr,
