@@ -37,6 +37,7 @@ def _kernel_fused_attention(
     BLOCK_SIZE_M: tl.constexpr,
     BLOCK_SIZE_N: tl.constexpr,
     BLOCK_DMODEL: tl.constexpr,
+    IS_CAUSAL: tl.constexpr,
 ):
     # the program id basically whatever the grid is
     pid = tl.program_id(0)  # seq_len // BLOCK_SIZE_M
@@ -57,41 +58,49 @@ def _kernel_fused_attention(
     m_idx = tl.arange(0, BLOCK_SIZE_M)
     n_idx = tl.arange(0, BLOCK_SIZE_N)
 
+    q_pos = start_m + m_idx
+
     # Fixated on one Q
     offset_qd = d_idx * stride_qd
-    offset_qs = (start_m + m_idx) * stride_qs
+    offset_qs = q_pos * stride_qs
     offset_qh = h * stride_qh
     offset_qb = b * stride_qb
 
     offsets_q = offset_qb + offset_qh + offset_qs[:, None] + offset_qd[None, :]
-    mask_q = ((start_m + m_idx)[:, None] < seq_len) & (d_idx[None, :] < dim)
+    mask_q = (q_pos[:, None] < seq_len) & (d_idx[None, :] < dim)
     q_val = tl.load(q_ptr + offsets_q, mask=mask_q, other=0.0)
 
     for start_n in range(0, seq_len, BLOCK_SIZE_N):
+        k_pos = start_n + n_idx
         # find the K
         offset_kd = d_idx * stride_kd
-        offset_ks = (start_n + n_idx) * stride_ks
+        offset_ks = k_pos * stride_ks
         offset_kh = h * stride_kh
         offset_kb = b * stride_kb
 
         offsets_k = offset_kb + offset_kh + offset_ks[None, :] + offset_kd[:, None]
-        mask_k = ((start_n + n_idx)[None, :] < seq_len) & (d_idx[:, None] < dim)
+        mask_k = (k_pos[None, :] < seq_len) & (d_idx[:, None] < dim)
 
         k_val = tl.load(k_ptr + offsets_k, mask=mask_k, other=0.0)
 
         # find the V
         offset_vd = d_idx * stride_vd
-        offset_vs = (start_n + n_idx) * stride_vs
+        offset_vs = k_pos * stride_vs
         offset_vh = h * stride_vh
         offset_vb = b * stride_vb
 
         offsets_v = offset_vb + offset_vh + offset_vs[:, None] + offset_vd[None, :]
-        mask_v = ((start_n + n_idx)[:, None] < seq_len) & (d_idx[None, :] < dim)
+        mask_v = (k_pos[:, None] < seq_len) & (d_idx[None, :] < dim)
 
         v_val = tl.load(v_ptr + offsets_v, mask=mask_v, other=0.0).to(tl.float32)
         # find attention score
         S_ij = tl.dot(q_val, k_val) * qk_scale
-        key_mask = (start_n + n_idx)[None, :] < seq_len
+
+        key_mask = k_pos[None, :] < seq_len
+
+        if IS_CAUSAL:
+            key_mask = key_mask & (q_pos[:, None] >= k_pos[None, :])
+
         S_ij = tl.where(key_mask, S_ij, -float("inf"))
 
         # skibidi max across row
@@ -130,7 +139,7 @@ def _kernel_fused_attention(
     tl.store(o_ptr + offsets_o, acc, mask=mask_o)
 
 
-def triton_fused_attention(Q, K, V):
+def triton_fused_attention(Q, K, V, is_causal):
     assert Q.ndim == 4, f"Q must be 4D [B, H, S, D], got shape {Q.shape}"
     assert K.ndim == 4, f"K must be 4D [B, H, S, D], got shape {K.shape}"
     assert V.ndim == 4, f"V must be 4D [B, H, S, D], got shape {V.shape}"
@@ -208,6 +217,7 @@ def triton_fused_attention(Q, K, V):
         BLOCK_SIZE_M=BLOCK_SIZE_M,
         BLOCK_SIZE_N=64,
         BLOCK_DMODEL=max(dim, 16),
+        IS_CAUSALs=int(is_causal),
         num_warps=4,
         num_stages=2,
     )
@@ -220,6 +230,7 @@ def test_dense_attention(
     seq_len,
     dim,
     num_heads=1,
+    is_causal: bool = False,
     dtype=torch.float16,
     rtol: float = 1e-2,
     atol: float = 1e-2,
@@ -234,10 +245,10 @@ def test_dense_attention(
         v,
         attn_mask=None,
         dropout_p=0.0,
-        is_causal=False,
+        is_causal=is_causal,
     )
 
-    triton_out = triton_fused_attention(q, k, v)
+    triton_out = triton_fused_attention(q, k, v, is_causal=is_causal)
 
     torch.testing.assert_close(
         triton_out,
