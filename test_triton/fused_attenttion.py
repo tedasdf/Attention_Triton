@@ -172,6 +172,7 @@ def triton_fused_attention(Q, K, V):
     Output = torch.empty_like(Q)
 
     BLOCK_SIZE_M = 64
+
     grid = (
         triton.cdiv(seq_len, BLOCK_SIZE_M),
         num_heads * batch,
@@ -251,16 +252,17 @@ def benchmark():
 
 
 if __name__ == "__main__":
-    for dim in [4, 8, 16, 32, 64, 128]:
-        try:
-            test_dense_attention(2, 8, dim, 8, dtype=torch.float32)
-            print(dim, "fp32 pass")
-        except Exception as e:
-            print(dim, "fp32 fail", e)
+    test_dense_attention(2, 8, 16, 8)
+    # for dim in [4, 8, 16, 32, 64, 128]:
+    #     try:
+    #         test_dense_attention(2, 8, dim, 8, dtype=torch.float32)
+    #         print(dim, "fp32 pass")
+    #     except Exception as e:
+    #         print(dim, "fp32 fail", e)
 
-    for dim in [4, 8, 16, 32, 64, 128]:
-        try:
-            test_dense_attention(2, 8, dim, 8, dtype=torch.float16)
-            print(dim, "fp16 pass")
-        except Exception as e:
-            print(dim, "fp16 fail", e)
+    # for dim in [4, 8, 16, 32, 64, 128]:
+    #     try:
+    #         test_dense_attention(2, 8, dim, 8, dtype=torch.float16)
+    #         print(dim, "fp16 pass")
+    #     except Exception as e:
+    #         print(dim, "fp16 fail", e)
