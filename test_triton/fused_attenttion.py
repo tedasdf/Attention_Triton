@@ -93,13 +93,13 @@ def _kernel_fused_attention(
         S_ij = tl.dot(q_val, k_val) * qk_scale
 
         # skibidi max across row
-        m_hat_ij = tl.max(S_ij, dim=1)
+        m_hat_ij = tl.max(S_ij, axis=1)
 
         # find the exponential temr
         P_ij = tl.exp(S_ij - m_hat_ij[:, None])
 
         # what the sigm row sum
-        l_hat_i = tl.sum(P_ij, dim=1)
+        l_hat_i = tl.sum(P_ij, axis=1)
 
         # find maximum
         m_new = tl.maximum(m_i, m_hat_ij)
