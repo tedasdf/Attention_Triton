@@ -251,4 +251,9 @@ def benchmark():
 
 
 if __name__ == "__main__":
-    test_dense_attention(1, 128, 64, 1)
+    test_dense_attention(1, 128, 64, 10)
+
+    test_dense_attention(10, 256, 64, 2)
+    test_dense_attention(2, 8, 128, 4)
+    test_dense_attention(5, 16, 256, 6)
+    test_dense_attention(1, 128, 64, 5)
