@@ -188,6 +188,8 @@ def triton_fused_attention(Q, K, V, is_causal):
         num_heads * batch,
     )
 
+    is_causal = int(is_causal)
+
     _kernel_fused_attention[grid](
         Q,
         K,
@@ -217,7 +219,7 @@ def triton_fused_attention(Q, K, V, is_causal):
         BLOCK_SIZE_M=BLOCK_SIZE_M,
         BLOCK_SIZE_N=64,
         BLOCK_DMODEL=max(dim, 16),
-        IS_CAUSAL=int(is_causal),
+        IS_CAUSAL=is_causal,
         num_warps=4,
         num_stages=2,
     )
