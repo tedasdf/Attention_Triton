@@ -91,6 +91,8 @@ def _kernel_fused_attention(
         v_val = tl.load(v_ptr + offsets_v, mask=mask_v, other=0.0).to(tl.float32)
         # find attention score
         S_ij = tl.dot(q_val, k_val) * qk_scale
+        key_mask = (start_n + n_idx)[None, :] < seq_len
+        S_ij = tl.where(key_mask, S_ij, -float("inf"))
 
         # skibidi max across row
         m_hat_ij = tl.max(S_ij, axis=1)
@@ -172,7 +174,6 @@ def triton_fused_attention(Q, K, V):
     Output = torch.empty_like(Q)
 
     BLOCK_SIZE_M = 64
-
     grid = (
         triton.cdiv(seq_len, BLOCK_SIZE_M),
         num_heads * batch,
@@ -252,7 +253,13 @@ def benchmark():
 
 
 if __name__ == "__main__":
-    test_dense_attention(2, 8, 16, 8)
+    test_dense_attention(1, 128, 64, 10)
+    test_dense_attention(10, 256, 64, 2)
+
+    test_dense_attention(2, 8, 128, 4)
+    test_dense_attention(5, 16, 256, 6)
+    test_dense_attention(1, 128, 64, 5)
+
     # for dim in [4, 8, 16, 32, 64, 128]:
     #     try:
     #         test_dense_attention(2, 8, dim, 8, dtype=torch.float32)
