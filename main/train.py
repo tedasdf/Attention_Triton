@@ -9,14 +9,25 @@ from tqdm import tqdm
 import structlog
 
 # train.py
+from main.logging import (
+    CheckpointConfig,
+    create_run_dir,
+    load_checkpoint,
+    maybe_save_step_checkpoint,
+    save_best_checkpoint,
+    save_config_snapshot,
+    save_latest_checkpoint,
+    update_run_metadata,
+    write_run_metadata,
+)
 from model.config import GPTConfig, Hyperparameters
 from model.transformer import GPT
-from utils.data import get_titles, BPETokenizer, train_tokenizer
+from utils.data import BPETokenizer
 from utils.logger import WandbLogger
 import mlflow
 import wandb
 import os
-
+import numpy as np
 from omegaconf import OmegaConf
 
 
@@ -107,16 +118,29 @@ def main(parser):
     loaded_cfg = OmegaConf.load("main/config/base.yaml")
     cfg = OmegaConf.merge(schema, loaded_cfg.hyperparameters)
 
+    ckpt_cfg = CheckpointConfig(**loaded_cfg.checkpointing)
+
+    run_paths = create_run_dir(output_root=parser.output_dir)
+    run_dir = run_paths["run_dir"]
+    checkpoints_dir = run_paths["checkpoints_dir"]
+
     data_dir = Path(parser.data_dir)
+    train_path = data_dir / "train.bin"
+    val_path = data_dir / "val.bin"
+    tokenizer_path = data_dir / "tokenizer.json"
+    metadata_path = data_dir / "metadata.json"
+
     output_dir = Path(parser.output_dir)
-    vocab_path = data_dir / "vocab.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     print("-" * 30)
     print(f"📂 Data Dir: {data_dir.absolute()} | Exists: {data_dir.exists()}")
     print(f"📂 Output Dir: {output_dir.absolute()} | Exists: {output_dir.exists()}")
-    print(f"📄 Vocab Path: {vocab_path} | Exists: {vocab_path.exists()}")
+    print(f"📄 Train Path: {train_path} | Exists: {train_path.exists()}")
+    print(f"📄 Val Path: {val_path} | Exists: {val_path.exists()}")
+    print(f"📄 Tokenizer Path: {tokenizer_path} | Exists: {tokenizer_path.exists()}")
+    print(f"📄 Metadata Path: {metadata_path} | Exists: {metadata_path.exists()}")
     print("-" * 30)
-    # output_dir.mkdir(parents=True, exist_ok=True)
 
     # Inside your main()
     if parser.smoke_test:
@@ -143,43 +167,33 @@ def main(parser):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.log("device_info", device=device)
 
-    train_titles, val_titles = get_titles(
-        cfg.num_titles,
-        cfg.seed,
-        cfg.val_frac,
-        smoke_test=parser.smoke_test,
-        data_dir=data_dir,
-    )
+    if not train_path.exists():
+        raise FileNotFoundError(f"Missing train.bin at {train_path}")
+    if not val_path.exists():
+        raise FileNotFoundError(f"Missing val.bin at {val_path}")
+    if not tokenizer_path.exists():
+        raise FileNotFoundError(f"Missing tokenizer.json at {tokenizer_path}")
 
-    # 2. Tokenizer: Don't retrain if not necessary
-    if vocab_path.exists():
-        logger.log("tokenizer_info", status="loading_existing", path=str(vocab_path))
-        tok = BPETokenizer.load(vocab_path)  # Assumes you have a .load() method
-    else:
-        logger.log("tokenizer_info", status="training_new")
-        vocab = train_tokenizer(
-            train_titles + val_titles, cfg.vocab_size, eos_token="<eos>"
-        )
-        tok = BPETokenizer(vocab)
+    tok = BPETokenizer.load(tokenizer_path)
 
-    eos_token = "<eos>"
-    tok = BPETokenizer(
-        train_tokenizer(train_titles + val_titles, cfg.vocab_size, eos_token=eos_token)
-    )
-    train_text = eos_token.join(train_titles) + eos_token
-    val_text = eos_token.join(val_titles) + eos_token
-    train_ids = torch.tensor(tok.encode(train_text), dtype=torch.long)
-    val_ids = torch.tensor(tok.encode(val_text), dtype=torch.long)
+    train_ids = torch.from_numpy(np.fromfile(train_path, dtype=np.int64)).long()
+    val_ids = torch.from_numpy(np.fromfile(val_path, dtype=np.int64)).long()
+
+    if metadata_path.exists():
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            dataset_metadata = json.load(f)
+        logger.log("dataset_metadata_loaded", **dataset_metadata)
 
     batches = len(train_ids) // (cfg.block_size * cfg.batch_size)
     max_steps = cfg.epochs * batches
-    eval_interval = batches // cfg.evals_per_epoch
+    eval_interval = max(1, batches // cfg.evals_per_epoch)
+
     logger.log(
         "dataset_info",
-        titles_count=len(train_titles),
+        train_tokens=len(train_ids),
+        val_tokens=len(val_ids),
         epochs=cfg.epochs,
         batches_per_epoch=batches,
-        tokens_per_epoch=len(train_ids),
         vocab_size=tok.vocab_size,
     )
 
@@ -194,6 +208,7 @@ def main(parser):
     def evaluate():
         model.eval()
         losses = 0.0
+        total_tokens = 0
         with torch.no_grad():
             for xb, yb in iter_full_split(
                 val_ids, cfg.block_size, cfg.batch_size, device
@@ -202,8 +217,10 @@ def main(parser):
                 B, T, V = logits.size()
                 loss = F.cross_entropy(logits.view(-1, V), yb.view(-1), reduction="sum")
                 losses += loss.item()
+                total_tokens += yb.numel()
+
         model.train()
-        return losses / len(val_text)
+        return losses / total_tokens if total_tokens > 0 else float("inf")
 
     wandb_logger = WandbLogger(
         project="ntp-transformer",
@@ -214,7 +231,38 @@ def main(parser):
     ptr = 0
     step = 0
     t0 = time.time()
-    for epoch in range(1, cfg.epochs + 1):
+
+    save_config_snapshot(parser.config_path, run_dir)
+    write_run_metadata(
+        run_dir=run_dir,
+        run_name=run_dir.name,
+        data_dir=data_dir,
+        tokenizer_path=tokenizer_path,
+        dataset_metadata_path=metadata_path,
+        config_path=parser.config_path,
+    )
+    best_val_loss = float("inf")
+
+    start_epoch = 1
+    if parser.resume:
+        resume_path = (
+            checkpoints_dir / "latest.pt"
+            if parser.resume == "latest"
+            else Path(parser.resume)
+        )
+        state = load_checkpoint(
+            path=resume_path,
+            model=model,
+            opt=opt,
+            scheduler=scheduler,
+            device=device,
+        )
+        start_epoch = state["epoch"]
+        step = state["step"]
+        ptr = state["ptr"]
+        best_val_loss = state["best_val_loss"]
+
+    for epoch in range(start_epoch, cfg.epochs + 1):
         for _ in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
             step += 1
             xb, yb, ptr = get_batch(
@@ -252,6 +300,60 @@ def main(parser):
                     max_steps=max_steps,
                     loss=val_loss,
                     elapsed_time=elapsed,
+                )
+                save_latest_checkpoint(
+                    ckpt_cfg=ckpt_cfg,
+                    checkpoints_dir=checkpoints_dir,
+                    model=model,
+                    opt=opt,
+                    scheduler=scheduler,
+                    epoch=epoch,
+                    step=step,
+                    ptr=ptr,
+                    best_val_loss=best_val_loss,
+                    config=hyperparams_dict,
+                    data_dir=data_dir,
+                    tokenizer_path=tokenizer_path,
+                )
+
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    save_best_checkpoint(
+                        ckpt_cfg=ckpt_cfg,
+                        checkpoints_dir=checkpoints_dir,
+                        model=model,
+                        opt=opt,
+                        scheduler=scheduler,
+                        epoch=epoch,
+                        step=step,
+                        ptr=ptr,
+                        best_val_loss=best_val_loss,
+                        config=hyperparams_dict,
+                        data_dir=data_dir,
+                        tokenizer_path=tokenizer_path,
+                    )
+
+                update_run_metadata(
+                    run_dir,
+                    latest_step=step,
+                    latest_epoch=epoch,
+                    best_val_loss=best_val_loss,
+                    status="running",
+                )
+
+                maybe_save_step_checkpoint(
+                    ckpt_cfg=ckpt_cfg,
+                    checkpoints_dir=checkpoints_dir,
+                    model=model,
+                    opt=opt,
+                    scheduler=scheduler,
+                    epoch=epoch,
+                    step=step,
+                    ptr=ptr,
+                    best_val_loss=best_val_loss,
+                    config=hyperparams_dict,
+                    data_dir=data_dir,
+                    tokenizer_path=tokenizer_path,
                 )
 
     if not parser.smoke_test:
@@ -314,8 +416,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="data",
-        help="Path to datasets (symlinked or local)",
+        default="datasets/hn_v1",
+        help="Path to processed dataset folder containing train.bin, val.bin, tokenizer.json, metadata.json",
     )
     parser.add_argument(
         "--output_dir",
@@ -326,6 +428,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--smoke-test", action="store_true", help="Run a quick 1-batch validation"
+    )
+    parser.add_argument(
+        "--resume", action="store_true", help="Run a quick 1-batch validation"
     )
 
     parser = parser.parse_args()

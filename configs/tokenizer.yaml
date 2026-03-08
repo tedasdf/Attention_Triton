@@ -1,9 +1,29 @@
+dataset:
+  source_type: huggingface
+  dataset_name: julien040/hacker-news-posts
+  dataset_split: train
+  text_field: title
+  output_dir: artifacts/datasets/hn_v1
+  cache_dir: data/hf_cache
+  num_samples: 100000
+  seed: 1337
+  val_frac: 0.1
+
 tokenizer:
-  version: "tok_v0001"
-  vocab_size: 32000
-  special_tokens: ["<pad>", "<eos>", "<unk>"]
-  source_dir: "artifacts/preprocess/v0001/05_snapshot"
-  text_fields: ["instruction", "code_ref"]
-  output_dir: "artifacts/tokenizer/"
-  batch_size: 4096
-  debug: True
+  vocab_size: 16000
+  eos_token: "<eos>"
+  reuse_existing: true
+  vocab_filename: vocab.json
+# tokenizer:
+#   version: "tok_v0001"
+#   vocab_size: 32000
+#   special_tokens: ["<pad>", "<eos>", "<unk>"]
+#   source_dir: "artifacts/preprocess/v0001/05_snapshot"
+#   text_fields: ["instruction", "code_ref"]
+#   output_dir: "artifacts/tokenizer/"
+#   batch_size: 4096
+#   text_field: title
+#   num_samples: 100000
+#   seed: 1337
+#   val_frac: 0.1
+#   smoke_test: True
