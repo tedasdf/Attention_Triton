@@ -125,6 +125,8 @@ def write_dataset_metadata(
     tokenizer_cfg: TokenizerConfig,
     train_samples: list[str],
     val_samples: list[str],
+    train_text_len: int,
+    val_text_len: int,
     output_dir: Path,
 ) -> None:
     metadata = {
@@ -136,6 +138,8 @@ def write_dataset_metadata(
         "val_frac": cfg.val_frac,
         "train_samples": len(train_samples),
         "val_samples": len(val_samples),
+        "train_text": train_text_len,
+        "val_text": val_text_len,
         "tokenizer": {
             "vocab_size": tokenizer_cfg.vocab_size,
             "eos_token": tokenizer_cfg.eos_token,
@@ -172,13 +176,6 @@ def main(parser) -> None:
 
     # write_jsonl(train_samples, train_path)
     # write_jsonl(val_samples, val_path)
-    write_dataset_metadata(
-        dataset_cfg,
-        tokenizer_cfg,
-        train_titles,
-        val_titles,
-        output_dir,
-    )
 
     print(f"Saved metadata to:      {output_dir / 'metadata.json'}")
     print(f"Train samples: {len(train_titles)}")
@@ -206,6 +203,16 @@ def main(parser) -> None:
     val_bin_path = output_dir / "val.bin"
     train_ids.numpy().tofile(train_bin_path)
     val_ids.numpy().tofile(val_bin_path)
+
+    write_dataset_metadata(
+        dataset_cfg,
+        tokenizer_cfg,
+        train_titles,
+        val_titles,
+        len(train_text),
+        len(val_text),
+        output_dir,
+    )
 
 
 if __name__ == "__main__":
