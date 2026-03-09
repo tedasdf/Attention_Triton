@@ -120,11 +120,11 @@ def main(parser):
 
     ckpt_cfg = CheckpointConfig(**loaded_cfg.checkpointing)
 
-    run_paths = create_run_dir(output_root=parser.output_dir)
+    run_paths = create_run_dir(output_root=cfg.output_dir)
     run_dir = run_paths["run_dir"]
     checkpoints_dir = run_paths["checkpoints_dir"]
 
-    data_dir = Path(parser.data_dir)
+    data_dir = Path(cfg.data_dir)
     train_path = data_dir / "train.bin"
     val_path = data_dir / "val.bin"
     tokenizer_path = data_dir / "tokenizer.json"
