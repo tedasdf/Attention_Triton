@@ -23,7 +23,7 @@ tasks:
     desc: "Run tokenizer (config-driven)"
     cmds:
       - echo "==> Preprocess using config:{{.CONFIG_TOKENIZER}}"
-      - python dataset_pipeline/train_tokenizer.py --config "{{.CONFIG_PREPROCESS}}"
+      - python dataset_pipeline/preprocess.py --config "{{.CONFIG_PREPROCESS}}"
 
 
   train:
