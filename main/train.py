@@ -9,7 +9,7 @@ from tqdm import tqdm
 import structlog
 
 # train.py
-from main.logging import (
+from main.checkpoint import (
     CheckpointConfig,
     create_run_dir,
     load_checkpoint,
