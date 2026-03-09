@@ -1,5 +1,5 @@
 import torch
-from standard import CausalSelfAttention
+from .standard import CausalSelfAttention
 
 
 class SlidingWindowSelfAttention(CausalSelfAttention):
