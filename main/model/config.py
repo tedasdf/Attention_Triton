@@ -21,6 +21,9 @@ class Hyperparameters:
     val_frac: float = 0.10
     log_file: str = "./logs/mainrun.log"
 
+    data_dir: str = "./artifacts/datasets/hn_v1"
+    output_dir: str = "./artifacts/runs/train"
+
     nb_features: int = 256
 
     d_compression: int = 128

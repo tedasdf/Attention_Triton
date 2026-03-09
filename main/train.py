@@ -414,16 +414,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
 
     parser.add_argument(
-        "--data_dir",
+        "--config",
         type=str,
-        default="datasets/hn_v1",
-        help="Path to processed dataset folder containing train.bin, val.bin, tokenizer.json, metadata.json",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="checkpoints",
-        help="Where to save model.pt and best_loss.txt",
+        default="main/config/base.yaml",
+        help="Config path",
     )
 
     parser.add_argument(

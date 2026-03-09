@@ -15,6 +15,8 @@ hyperparameters:
   epochs: 7
   seed: 1337
   log_file: "./logs/mainrun.log"
+  data_dir: "./artifacts/datasets/hn_v1"
+  output_dir: "./artifacts/runs/train"
 
 checkpointing:
   save_latest: true
