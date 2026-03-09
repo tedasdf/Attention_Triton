@@ -127,7 +127,7 @@ def main(parser):
     data_dir = Path(cfg.data_dir)
     train_path = data_dir / "train.bin"
     val_path = data_dir / "val.bin"
-    tokenizer_path = data_dir / "tokenizer.json"
+    tokenizer_path = data_dir / "vocab.json"
     metadata_path = data_dir / "metadata.json"
 
     output_dir = Path(cfg.output_dir)
