@@ -97,16 +97,12 @@ def download_and_preprocess_huggingface_dataset(
     if cfg.source_type != "huggingface":
         raise ValueError(f"Expected source_type='huggingface', got {cfg.source_type}")
 
-    hf_cache_dir = Path(cfg.cache_dir)
-    hf_cache_dir.mkdir(parents=True, exist_ok=True)
-
     streaming = not smoke_test
 
     ds = load_dataset(
         cfg.dataset_name,
         split=cfg.dataset_split,
         streaming=streaming,
-        cache_dir=str(hf_cache_dir),
     )
 
     ds = ds.shuffle(seed=cfg.seed, buffer_size=10_000)
