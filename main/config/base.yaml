@@ -1,7 +1,7 @@
 # config.yaml
 hyperparameters:
-  block_size: 128
-  batch_size: 128
+  block_size: 64
+  batch_size: 256
   n_layer: 8
   n_head: 16
   d_model: 512
