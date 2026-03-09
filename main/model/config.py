@@ -24,6 +24,7 @@ class Hyperparameters:
     data_dir: str = "./artifacts/datasets/hn_v1"
     output_dir: str = "./artifacts/runs/train"
 
+    window_size: int = 32
     nb_features: int = 256
 
     d_compression: int = 128
@@ -76,6 +77,11 @@ class AttentionConfig:
 
 
 @dataclass
+class SlidingWindowAttentionConfig(AttentionConfig):
+    window_size: int
+
+
+@dataclass
 class MLPConfig:
     d_model: int
     dropout: float
@@ -104,7 +110,15 @@ class GPTConfig:
                 h.block_size,
                 h.dropout,
             )
-
+        elif h.attn_type == "sliding":
+            attn_cfg = SlidingWindowAttentionConfig(
+                h.attn_type,
+                h.d_model,
+                h.n_head,
+                h.block_size,
+                h.dropout,
+                window_size=h.block_size // 4,
+            )
         elif h.attn_type == "performer":
             attn_cfg = PerformerAttentionConfig(
                 h.attn_type,
