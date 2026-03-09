@@ -172,7 +172,7 @@ def main(parser):
     if not val_path.exists():
         raise FileNotFoundError(f"Missing val.bin at {val_path}")
     if not tokenizer_path.exists():
-        raise FileNotFoundError(f"Missing tokenizer.json at {tokenizer_path}")
+        raise FileNotFoundError(f"Missing vocab.json at {tokenizer_path}")
 
     tok = BPETokenizer.load(tokenizer_path)
 
@@ -414,7 +414,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NTP Transformer Training Pipeline")
 
     parser.add_argument(
-        "--config",
+        "--config_path",
         type=str,
         default="main/config/base.yaml",
         help="Config path",

@@ -29,7 +29,7 @@ class TokenizerConfig:
     eos_token: str = "<eos>"
     unk_token: str = "<unk>"
     reuse_existing: bool = True
-    vocab_filename: str = "tokenizer.json"
+    vocab_filename: str = "vocab.json"
 
 
 @dataclass

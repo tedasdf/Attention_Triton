@@ -30,7 +30,7 @@ tasks:
     desc: "Run training (config-driven)"
     cmds:
       - echo "==> Train using config:{{.CONFIG_TRAIN}}"
-      - python main/train.py --config "{{.CONFIG_TRAIN}}"
+      - python main/train.py --config_path "{{.CONFIG_TRAIN}}"
 
   eval:
     desc: "Run evaluation (config-driven)"
