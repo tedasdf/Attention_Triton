@@ -205,7 +205,7 @@ def main(parser):
     opt = torch.optim.SGD(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
-    original_val_len = dataset_metadata["val_text"]
+    original_val_len = dataset_metadata.val_text
 
     def evaluate():
         model.eval()
