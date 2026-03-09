@@ -115,7 +115,7 @@ def iter_full_split(
 def main(parser):
     # 1. Create a config object from the dataclass
     schema = OmegaConf.structured(Hyperparameters)
-    loaded_cfg = OmegaConf.load("main/config/base.yaml")
+    loaded_cfg = OmegaConf.load(parser.config_path)
     cfg = OmegaConf.merge(schema, loaded_cfg.hyperparameters)
 
     ckpt_cfg = CheckpointConfig(**loaded_cfg.checkpointing)
