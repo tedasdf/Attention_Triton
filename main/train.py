@@ -205,6 +205,8 @@ def main(parser):
     opt = torch.optim.SGD(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
+    original_val_len = dataset_metadata["val_text"]
+
     def evaluate():
         model.eval()
         losses = 0.0
@@ -220,7 +222,7 @@ def main(parser):
                 total_tokens += yb.numel()
 
         model.train()
-        return losses / total_tokens if total_tokens > 0 else float("inf")
+        return losses / original_val_len  # if total_tokens > 0 else float("inf")
 
     wandb_logger = WandbLogger(
         project="ntp-transformer",
