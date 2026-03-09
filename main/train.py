@@ -130,7 +130,7 @@ def main(parser):
     tokenizer_path = data_dir / "tokenizer.json"
     metadata_path = data_dir / "metadata.json"
 
-    output_dir = Path(parser.output_dir)
+    output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("-" * 30)
