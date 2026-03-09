@@ -2,7 +2,6 @@
 hyperparameters:
   block_size: 128
   batch_size: 128
-  vocab_size: 16000
   n_layer: 6
   n_head: 16
   d_model: 512
@@ -15,6 +14,10 @@ hyperparameters:
   attn_type: "standard"
   epochs: 7
   seed: 1337
-  num_titles: 100000
-  val_frac: 0.10
   log_file: "./logs/mainrun.log"
+
+checkpointing:
+  save_latest: true
+  save_best: true
+  save_step_checkpoints: true
+  step_checkpoint_interval: 100

@@ -1,0 +1,29 @@
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "${GATEWAY_PORT}:8000"
+    environment:
+      VLLM_BASE_URL: ${VLLM_BASE_URL}
+    volumes:
+      - ./gateway:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  vllm:
+    build: ./vllm
+    ports:
+      - "${VLLM_PORT}:8000"
+    environment:
+      VLLM_MODEL: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+      VLLM_DTYPE: "auto"
+      VLLM_MAX_MODEL_LEN: "2048"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
