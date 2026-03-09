@@ -69,3 +69,10 @@ class BPETokenizer:
     @property
     def vocab_size(self):
         return self.tk.get_vocab_size()
+
+    @classmethod
+    def load(cls, path: Path):
+        return cls(Tokenizer.from_file(str(path)))
+
+    def save(self, path: Path):
+        self.tk.save(str(path))
