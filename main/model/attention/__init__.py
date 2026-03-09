@@ -4,9 +4,12 @@ from .GQA import GroupQueryAttn
 from .Performer import PerFormerAttention
 from .LinFormer import LinFormerAttn
 from .MLA import MultiLatentHeadAttn
+from .sliding import SlidingWindowSelfAttention
+
 
 ATTENTION_REGISTRY = {
     "standard": CausalSelfAttention,
+    "sliding": SlidingWindowSelfAttention,
     "performer": PerFormerAttention,
     "gpa": GroupQueryAttn,
     "linformer": LinFormerAttn,
