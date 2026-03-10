@@ -463,7 +463,6 @@ if __name__ == "__main__":
         default="ntp-transformer",
         help="W&B project name",
     )
-    parser.add_argument("--sweep", action="store_true", help="Run sweep experiment")
 
     parser = parser.parse_args()
 
