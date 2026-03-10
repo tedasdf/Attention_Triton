@@ -270,7 +270,7 @@ def main(parser):
         data_dir=data_dir,
         tokenizer_path=tokenizer_path,
         dataset_metadata_path=metadata_path,
-        hyperparameters=cfg,
+        hyperparameters=OmegaConf.to_container(cfg, resolve=True),
     )
     best_val_loss = float("inf")
 
