@@ -359,10 +359,13 @@ def main(parser):
                 )
 
     if not parser.smoke_test:
-        mlflow.set_tracking_uri("file:///storage/mlruns")
-        with mlflow.start_run(run_name="production_candidate"):
+        mlflow.set_tracking_uri("sqlite:///mlflow.db")
+        with mlflow.start_run(run_name="production_candidate") as run:
             mlflow.log_param("total_epochs", 10)
             mlflow.pytorch.log_model(model, "ntp_model")
+            mlflow_run_id = run.info.run_id
+    else:
+        mlflow_run_id = "none"
 
     if not parser.smoke_test:
         current_loss = val_loss
@@ -402,9 +405,7 @@ def main(parser):
                 f.write(
                     f"WANDB_RUN_NAME={wandb.run.name if wandb.run else 'offline'}\n"
                 )
-                f.write(
-                    f"MLFLOW_RUN_ID={mlflow.active_run().info.run_id if mlflow.active_run() else 'none'}\n"
-                )
+                f.write(f"MLFLOW_RUN_ID={mlflow_run_id}\n")
                 f.write(f"VAL_LOSS={current_loss:.4f}\n")
 
     wandb_logger.finish()
