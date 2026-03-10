@@ -216,7 +216,7 @@ def main(parser):
     model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.log("model_info", parameters_count=model_params)
 
-    opt = torch.optim.SGD(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
     original_val_len = dataset_metadata["val_text"]
@@ -387,22 +387,21 @@ def main(parser):
                     tokenizer_path=tokenizer_path,
                 )
 
-    if not parser.smoke_test:
+    use_mlflow = False
+    mlflow_run_id = "none"
+
+    if use_mlflow and not parser.smoke_test:
         mlflow.set_tracking_uri("sqlite:///mlflow.db")
         with mlflow.start_run(run_name="production_candidate") as run:
             mlflow.log_param("total_epochs", 10)
             mlflow.pytorch.log_model(model, "ntp_model")
             mlflow_run_id = run.info.run_id
-    else:
-        mlflow_run_id = "none"
 
     if not parser.smoke_test:
         current_loss = val_loss
         best_loss_path = output_dir / "best_loss.txt"
-        model_save_path = output_dir / "model.pt"  # Standard name for DVC to track
-        metadata_path = Path(
-            "run_metadata.env"
-        )  # Keep in root for the shell script to find
+        model_save_path = output_dir / "model.pt"
+        metadata_path = Path("run_metadata.env")
 
         is_better = True
         if best_loss_path.exists():
@@ -419,17 +418,14 @@ def main(parser):
                 print(
                     f"⚠️ Warning: {model_save_path.parent} is a file. Deleting to create directory."
                 )
-                model_save_path.parent.unlink()  # Deletes the file
+                model_save_path.parent.unlink()
             else:
                 print(f"This {model_save_path}")
 
             model_save_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), model_save_path)
-            # 2. Update best_loss record
             best_loss_path.write_text(f"{current_loss:.4f}")
 
-            # 3. Create metadata for the push_model.sh script
-            # Note: We write this to the ROOT so the shell script sees it easily
             with open(metadata_path, "w") as f:
                 f.write(
                     f"WANDB_RUN_NAME={wandb.run.name if wandb.run else 'offline'}\n"
