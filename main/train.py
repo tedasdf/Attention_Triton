@@ -464,6 +464,10 @@ if __name__ == "__main__":
         help="W&B project name",
     )
 
+    parser.add_argument(
+        "--resume", action="store_true", help="Resume previously stored checkpoint"
+    )
+
     parser = parser.parse_args()
 
     try:
