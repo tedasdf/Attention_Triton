@@ -270,7 +270,7 @@ def main(parser):
         data_dir=data_dir,
         tokenizer_path=tokenizer_path,
         dataset_metadata_path=metadata_path,
-        config_path=parser.config_path,
+        hyperparameters=cfg,
     )
     best_val_loss = float("inf")
 
