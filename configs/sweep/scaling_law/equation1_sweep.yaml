@@ -1,0 +1,25 @@
+method: grid
+metric:
+  name: validation/loss
+  goal: minimize
+
+parameters:
+  n_layer:
+    values: [4, 6, 8]
+  d_model:
+    values: [128, 256, 384, 512]
+  n_head:
+    values: [4, 6, 8]
+  batch_size:
+    values: [32, 64]
+  lr:
+    values: [0.001, 0.003, 0.006]
+
+program: train.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config_path
+  - main/config/base.yaml
+  - --sweep

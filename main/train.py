@@ -31,6 +31,16 @@ import numpy as np
 from omegaconf import OmegaConf
 
 
+def merge_sweep_config(cfg, sweep_cfg: dict):
+    """
+    Merge flat W&B sweep parameters into the OmegaConf hyperparameter config.
+    Only keys already present in cfg should be overridden.
+    """
+    valid_keys = set(cfg.keys())
+    filtered = {k: v for k, v in sweep_cfg.items() if k in valid_keys}
+    return OmegaConf.merge(cfg, OmegaConf.create(filtered))
+
+
 def configure_logging(log_file: str):
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
@@ -117,6 +127,10 @@ def main(parser):
     schema = OmegaConf.structured(Hyperparameters)
     loaded_cfg = OmegaConf.load(parser.config_path)
     cfg = OmegaConf.merge(schema, loaded_cfg.hyperparameters)
+
+    if parser.sweep:
+        wandb.init(project=parser.wandb_project)
+        cfg = merge_sweep_config(cfg, dict(wandb.config))
 
     ckpt_cfg = CheckpointConfig(**loaded_cfg.checkpointing)
 
@@ -224,11 +238,26 @@ def main(parser):
         model.train()
         return losses / original_val_len  # if total_tokens > 0 else float("inf")
 
-    wandb_logger = WandbLogger(
-        project="ntp-transformer",
-        config=hyperparams_dict,
-        enabled=not parser.smoke_test,
-    )
+    if parser.sweep:
+        # W&B run is already initialized by wandb.agent -> wandb.init()
+        wandb.config.update(
+            OmegaConf.to_container(cfg, resolve=True), allow_val_change=True
+        )
+
+        class SweepLogger:
+            def log_metrics(self, metrics, step=None):
+                wandb.log(metrics, step=step)
+
+            def finish(self):
+                wandb.finish()
+
+        wandb_logger = SweepLogger()
+    else:
+        wandb_logger = WandbLogger(
+            project=parser.wandb_project,
+            config=OmegaConf.to_container(cfg, resolve=True),
+            enabled=not parser.smoke_test,
+        )
 
     ptr = 0
     step = 0
@@ -427,8 +456,18 @@ if __name__ == "__main__":
         "--smoke-test", action="store_true", help="Run a quick 1-batch validation"
     )
     parser.add_argument(
-        "--resume", action="store_true", help="Run a quick 1-batch validation"
+        "--sweep",
+        action="store_true",
+        help="Enable W&B sweep mode and override config from wandb.config",
     )
+
+    parser.add_argument(
+        "--wandb_project",
+        type=str,
+        default="ntp-transformer",
+        help="W&B project name",
+    )
+    parser.add_argument("--sweep", action="store_true", help="Run sweep experiment")
 
     parser = parser.parse_args()
 

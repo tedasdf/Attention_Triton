@@ -6,6 +6,7 @@ vars:
   CONFIG_TRAIN: "configs/train.yaml"
   CONFIG_EVAL: "configs/eval.yaml"
   CONFIG_SERVE: "configs/serve.yaml"
+  CONFIG_SWEEP: "configs/sweep/equation1_sweep.yaml"
 
 tasks:
   default:
@@ -31,6 +32,14 @@ tasks:
     cmds:
       - echo "==> Train using config:{{.CONFIG_TRAIN}}"
       - python main/train.py --config_path "{{.CONFIG_TRAIN}}"
+
+  sweep:create:
+    cmds:
+      - wandb sweep sweep.yaml
+  
+  sweep:agent:
+    cmds:
+      - wandb agent {{.SWEEP_ID}}
 
   eval:
     desc: "Run evaluation (config-driven)"
