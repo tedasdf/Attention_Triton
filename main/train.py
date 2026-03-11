@@ -294,17 +294,20 @@ def main(parser):
         best_val_loss = state["best_val_loss"]
 
     for epoch in range(start_epoch, cfg.epochs + 1):
-        for _ in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
+        for i in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
             step += 1
             xb, yb, ptr = get_batch(
                 train_ids, ptr, cfg.block_size, cfg.batch_size, device
             )
             _, loss = model(xb, yb)
-            opt.zero_grad(set_to_none=True)
+
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
-            scheduler.step()
+
+            if (i % cfg.accumulation_steps == 0) or (i == batches):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
+                scheduler.step()
+                opt.zero_grad(set_to_none=True)
 
             elapsed = time.time() - t0
             logger.log(

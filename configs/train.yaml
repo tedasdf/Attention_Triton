@@ -3,8 +3,8 @@ hyperparameters:
   block_size: 128
   batch_size: 256
   n_layer: 6
-  n_head: 32
-  d_model: 1024
+  n_head: 8
+  d_model: 512
   d_compression: 128
   dropout: 0.4
   nb_features: 256
@@ -17,7 +17,7 @@ hyperparameters:
   log_file: "./logs/mainrun.log"
   data_dir: "./artifacts/datasets/hn_v1"
   output_dir: "./artifacts/runs/train"
-
+  accumulation_steps: 2
 
 checkpointing:
   save_latest: true

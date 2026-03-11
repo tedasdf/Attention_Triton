@@ -20,7 +20,7 @@ class Hyperparameters:
     num_titles: int = 100_000
     val_frac: float = 0.10
     log_file: str = "./logs/mainrun.log"
-
+    accumulation_steps: int = 2
     data_dir: str = "./artifacts/datasets/hn_v1"
     output_dir: str = "./artifacts/runs/train"
 
