@@ -37,7 +37,9 @@ tasks:
     cmds:
       - wandb sweep {{.CONFIG_SWEEP}}
   
-  sweep:agent:
+  sweep:agent:*:
+    vars:
+      SWEEP_ID: '{{index .MATCH 0}}'
     cmds:
       - wandb agent {{.SWEEP_ID}}
 
