@@ -15,7 +15,7 @@ parameters:
   lr:
     values: [0.001, 0.003, 0.006]
 
-program: train.py
+program: main/train.py
 command:
   - ${env}
   - python
