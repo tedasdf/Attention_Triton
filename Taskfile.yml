@@ -35,7 +35,7 @@ tasks:
 
   sweep:create:
     cmds:
-      - wandb sweep sweep.yaml
+      - wandb sweep {{.CONFIG_SWEEP}}
   
   sweep:agent:
     cmds:

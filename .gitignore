@@ -28,3 +28,8 @@ logs/
 .dvc/updater
 
 *.parquet
+
+
+serve/
+
+test_triton/
