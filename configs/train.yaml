@@ -9,7 +9,7 @@ hyperparameters:
   dropout: 0.4
   nb_features: 256
   lr: 0.01         # Scientific notation (6e-3) is also supported
-  weight_decay: 0.05
+  weight_decay: 0.1
   evals_per_epoch: 3
   attn_type: "sliding"
   epochs: 7
