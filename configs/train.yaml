@@ -4,7 +4,7 @@ hyperparameters:
   batch_size: 256
   n_layer: 6
   n_head: 8
-  d_model: 512
+  d_model: 256
   d_compression: 128
   dropout: 0.4
   nb_features: 256
