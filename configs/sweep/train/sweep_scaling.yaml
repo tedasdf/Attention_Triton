@@ -4,6 +4,13 @@ metric:
   name: val_loss
   goal: minimize
 
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --sweep
+  - ${args_no_boolean_flags}
+
 parameters:
   config_path:
     values:
