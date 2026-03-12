@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-
 import json
 
 from datasets import load_dataset
@@ -73,7 +72,8 @@ def train_tokenizer(
     tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel()
     tokenizer.decoder = decoders.ByteLevel()
     trainer = trainers.BpeTrainer(
-        vocab_size=vocab_size, special_tokens=[pad_token, eos_token, unk_token]
+        vocab_size=vocab_size,
+        special_tokens=[pad_token, eos_token, unk_token],
     )
     tokenizer.train_from_iterator(titles, trainer)
     return tokenizer
@@ -84,6 +84,7 @@ def load_config(config_path: str) -> AppConfig:
     loaded_cfg = OmegaConf.load(config_path)
     merged = OmegaConf.merge(schema, loaded_cfg)
     cfg_dict = OmegaConf.to_container(merged, resolve=True)
+
     return AppConfig(
         dataset=DatasetConfig(**cfg_dict["dataset"]),
         tokenizer=TokenizerConfig(**cfg_dict["tokenizer"]),
@@ -111,9 +112,9 @@ def download_and_preprocess_huggingface_dataset(
     sampled_rows = list(ds.take(num_samples))
 
     titles = [
-        row["title"].strip()
+        row[cfg.text_field].strip()
         for row in sampled_rows
-        if row.get("title") and row["title"].strip()
+        if row.get(cfg.text_field) and row[cfg.text_field].strip()
     ]
 
     n_train = int(len(titles) * (1 - cfg.val_frac))
@@ -157,8 +158,38 @@ def write_dataset_metadata(
         json.dump(metadata, f, indent=2)
 
 
-def main(parser) -> None:
-    app_cfg = load_config(parser.config_path)
+def resolve_config_paths(config_path: str) -> list[Path]:
+    path = Path(config_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Config path does not exist: {path}")
+
+    if path.is_file():
+        if path.suffix.lower() not in {".yaml", ".yml"}:
+            raise ValueError(f"Expected a .yaml or .yml file, got: {path}")
+        return [path]
+
+    if path.is_dir():
+        yaml_files = sorted(
+            [
+                p
+                for p in path.iterdir()
+                if p.is_file() and p.suffix.lower() in {".yaml", ".yml"}
+            ]
+        )
+        if not yaml_files:
+            raise ValueError(f"No YAML files found in directory: {path}")
+        return yaml_files
+
+    raise ValueError(f"Unsupported config path: {path}")
+
+
+def run_single_config(config_path: Path, smoke_test: bool) -> None:
+    print("\n" + "=" * 80)
+    print(f"Running config: {config_path}")
+    print("=" * 80)
+
+    app_cfg = load_config(str(config_path))
     dataset_cfg = app_cfg.dataset
     tokenizer_cfg = app_cfg.tokenizer
 
@@ -168,34 +199,33 @@ def main(parser) -> None:
     if dataset_cfg.source_type == "huggingface":
         train_titles, val_titles = download_and_preprocess_huggingface_dataset(
             dataset_cfg,
-            smoke_test=parser.smoke_test,
+            smoke_test=smoke_test,
         )
     else:
         raise NotImplementedError(
             f"source_type '{dataset_cfg.source_type}' is not implemented yet."
         )
 
-    # train_path = output_dir / "train.jsonl"
-    # val_path = output_dir / "val.jsonl"
-
-    # write_jsonl(train_samples, train_path)
-    # write_jsonl(val_samples, val_path)
-
-    print(f"Saved metadata to:      {output_dir / 'metadata.json'}")
-    print(f"Train samples: {len(train_titles)}")
-    print(f"Val samples:   {len(val_titles)}")
+    print(f"Output dir:     {output_dir}")
+    print(f"Train samples:  {len(train_titles)}")
+    print(f"Val samples:    {len(val_titles)}")
 
     eos_token = tokenizer_cfg.eos_token
     vocab_path = output_dir / tokenizer_cfg.vocab_filename
 
     if tokenizer_cfg.reuse_existing and vocab_path.exists():
         tok = BPETokenizer.load(vocab_path)
+        print(f"Loaded existing tokenizer from: {vocab_path}")
     else:
         vocab = train_tokenizer(
-            train_titles, tokenizer_cfg.vocab_size, eos_token=eos_token
+            train_titles,
+            tokenizer_cfg.vocab_size,
+            unk_token=tokenizer_cfg.unk_token,
+            eos_token=eos_token,
         )
         tok = BPETokenizer(vocab)
         tok.save(vocab_path)
+        print(f"Saved tokenizer to: {vocab_path}")
 
     train_text = eos_token.join(train_titles) + eos_token
     val_text = eos_token.join(val_titles) + eos_token
@@ -220,11 +250,21 @@ def main(parser) -> None:
         output_dir,
     )
 
-    print(f"Train tokens:  {len(train_ids)}")
-    print(f"Val tokens:    {len(val_ids)}")
+    print(f"Saved metadata to: {output_dir / 'metadata.json'}")
+    print(f"Train tokens:      {len(train_ids)}")
+    print(f"Val tokens:        {len(val_ids)}")
 
-    avg_tokens_per_title = len(train_ids) / len(train_titles)
-    print(f"average tokens per title : {avg_tokens_per_title}")
+    avg_tokens_per_title = len(train_ids) / len(train_titles) if train_titles else 0.0
+    print(f"Average tokens/title: {avg_tokens_per_title:.4f}")
+
+
+def main(parser) -> None:
+    config_paths = resolve_config_paths(parser.config_path)
+
+    print(f"Found {len(config_paths)} config file(s).")
+
+    for config_path in config_paths:
+        run_single_config(config_path, smoke_test=parser.smoke_test)
 
 
 if __name__ == "__main__":
@@ -236,7 +276,7 @@ if __name__ == "__main__":
         "--config_path",
         type=str,
         default="configs/tokenizer.yaml",
-        help="Path to config YAML",
+        help="Path to a YAML config file or a directory containing YAML configs",
     )
     parser.add_argument(
         "--smoke_test",

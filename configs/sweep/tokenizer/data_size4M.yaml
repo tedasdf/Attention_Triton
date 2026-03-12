@@ -3,8 +3,8 @@ dataset:
   dataset_name: julien040/hacker-news-posts
   dataset_split: train
   text_field: title
-  output_dir: artifacts/datasets/hn_v1
-  num_samples: 100000
+  output_dir: artifacts/datasets/hn_4M
+  num_samples: 365000
   seed: 1337
   val_frac: 0.1
 
