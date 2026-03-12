@@ -125,8 +125,10 @@ def write_dataset_metadata(
     tokenizer_cfg: TokenizerConfig,
     train_samples: list[str],
     val_samples: list[str],
-    train_text_len: int,
-    val_text_len: int,
+    train_char_count: int,
+    val_char_count: int,
+    train_token_count: int,
+    val_token_count: int,
     output_dir: Path,
 ) -> None:
     metadata = {
@@ -138,8 +140,10 @@ def write_dataset_metadata(
         "val_frac": cfg.val_frac,
         "train_samples": len(train_samples),
         "val_samples": len(val_samples),
-        "train_text": train_text_len,
-        "val_text": val_text_len,
+        "train_chars": train_char_count,
+        "val_chars": val_char_count,
+        "train_tokens": train_token_count,
+        "val_tokens": val_token_count,
         "tokenizer": {
             "vocab_size": tokenizer_cfg.vocab_size,
             "eos_token": tokenizer_cfg.eos_token,
@@ -211,8 +215,13 @@ def main(parser) -> None:
         val_titles,
         len(train_text),
         len(val_text),
+        len(train_ids),
+        len(val_ids),
         output_dir,
     )
+
+    print(f"Train tokens:  {len(train_ids)}")
+    print(f"Val tokens:    {len(val_ids)}")
 
 
 if __name__ == "__main__":
