@@ -6,7 +6,7 @@ vars:
   CONFIG_TRAIN: "configs/train.yaml"
   CONFIG_EVAL: "configs/eval.yaml"
   CONFIG_SERVE: "configs/serve.yaml"
-  CONFIG_SWEEP: "configs/sweep/equation1_sweep.yaml"
+  CONFIG_SWEEP: "configs/sweep/train/sweep_scaling.yaml"
 
 tasks:
   default:
