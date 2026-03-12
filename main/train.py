@@ -2,6 +2,7 @@ import random
 import time
 import json
 from pathlib import Path
+import math
 
 import torch
 from torch.nn import functional as F
@@ -197,6 +198,17 @@ def main(parser):
     train_ids = torch.from_numpy(np.fromfile(train_path, dtype=np.int64)).long()
     val_ids = torch.from_numpy(np.fromfile(val_path, dtype=np.int64)).long()
 
+    target_train_tokens = 8_000_000
+    tokens_per_epoch = len(train_ids)
+    cfg.epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
+
+    logger.log(
+        "training_budget",
+        target_train_tokens=target_train_tokens,
+        tokens_per_epoch=tokens_per_epoch,
+        computed_epochs=cfg.epochs,
+    )
+
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             dataset_metadata = json.load(f)
@@ -225,8 +237,6 @@ def main(parser):
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
-    original_val_len = dataset_metadata["val_tokens"]
-
     def evaluate():
         model.eval()
         losses = 0.0
@@ -242,7 +252,7 @@ def main(parser):
                 total_tokens += yb.numel()
 
         model.train()
-        return losses / original_val_len  # if total_tokens > 0 else float("inf")
+        return losses / total_tokens  # if total_tokens > 0 else float("inf")
 
     if parser.sweep:
         # W&B run is already initialized by wandb.agent -> wandb.init()

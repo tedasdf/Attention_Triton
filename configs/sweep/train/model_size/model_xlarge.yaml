@@ -21,7 +21,7 @@ hyperparameters:
 
   log_file: "./logs/model_25m.log"
   data_dir: "./artifacts/datasets/hn_1m"
-  output_dir: "./artifacts/runs/train/model_25m"
+  output_dir: "./artifacts/runs/train/scaling_law/model_xlarge"
 
   accumulation_steps: 4
 
