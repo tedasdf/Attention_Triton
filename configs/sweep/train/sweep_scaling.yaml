@@ -1,0 +1,21 @@
+program: main/train.py
+method: grid
+metric:
+  name: val_loss
+  goal: minimize
+
+parameters:
+  config_path:
+    values:
+      - configs/train/model_size/model_small.yaml
+      - configs/train/model_size/model_base.yaml
+      - configs/train/model_size/model_large.yaml
+      - configs/train/model_size/model_xlarge.yaml
+
+  hyperparameters.data_dir:
+    values:
+      - ./artifacts/datasets/hn_250k
+      - ./artifacts/datasets/hn_500k
+      - ./artifacts/datasets/hn_1M
+      - ./artifacts/datasets/hn_2M
+      - ./artifacts/datasets/hn_4M
