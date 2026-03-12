@@ -225,7 +225,7 @@ def main(parser):
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
-    original_val_len = dataset_metadata["val_text"]
+    original_val_len = dataset_metadata["val_tokens"]
 
     def evaluate():
         model.eval()
