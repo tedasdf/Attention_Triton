@@ -2,7 +2,7 @@ version: "3"
 
 vars:
   CONFIG_PREPROCESS: "configs/preprocess.yaml"
-  CONFIG_TOKENIZER: "configs/tokenizer.yaml"
+  CONFIG_TOKENIZER: "configs/sweep/tokenizer"
   CONFIG_TRAIN: "configs/train.yaml"
   CONFIG_EVAL: "configs/eval.yaml"
   CONFIG_SERVE: "configs/serve.yaml"
