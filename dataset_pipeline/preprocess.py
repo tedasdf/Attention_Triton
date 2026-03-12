@@ -223,6 +223,9 @@ def main(parser) -> None:
     print(f"Train tokens:  {len(train_ids)}")
     print(f"Val tokens:    {len(val_ids)}")
 
+    avg_tokens_per_title = len(train_ids) / len(train_titles)
+    print(f"average tokens per title : {avg_tokens_per_title}")
+
 
 if __name__ == "__main__":
     import argparse
