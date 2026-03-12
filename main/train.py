@@ -125,11 +125,10 @@ def iter_full_split(
 def main(parser):
     if parser.sweep:
         wandb.init(project=parser.wandb_project)
-        config_path = wandb.config.get("config_path", parser.config_path)
+        config_path = wandb.config["config_path"]
     else:
         config_path = parser.config_path
 
-    # 1. Create a config object from the dataclass
     schema = OmegaConf.structured(Hyperparameters)
     loaded_cfg = OmegaConf.load(config_path)
     cfg = OmegaConf.merge(schema, loaded_cfg.hyperparameters)

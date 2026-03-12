@@ -6,10 +6,9 @@ metric:
 
 command:
   - ${env}
-  - ${interpreter}
+  - python
   - ${program}
   - --sweep
-  - ${args_no_boolean_flags}
 
 parameters:
   config_path:
