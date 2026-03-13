@@ -5,7 +5,7 @@ from .Performer import PerFormerAttention
 from .LinFormer import LinFormerAttn
 from .MLA import MultiLatentHeadAttn
 from .sliding import SlidingWindowSelfAttention
-
+from .flash_triton import FlashTritonAttention
 
 ATTENTION_REGISTRY = {
     "standard": CausalSelfAttention,
@@ -14,7 +14,7 @@ ATTENTION_REGISTRY = {
     "gpa": GroupQueryAttn,
     "linformer": LinFormerAttn,
     "mla": MultiLatentHeadAttn,
-    # "flash": FlashAttention,
+    "flash": FlashTritonAttention,
     # "sliding": SlidingAttention
 }
 
