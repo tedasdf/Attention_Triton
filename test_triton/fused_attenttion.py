@@ -54,6 +54,7 @@ def _kernel_fused_attention(
     k_ptr,
     v_ptr,
     o_ptr,
+    LSE_ptr,
     batch,
     num_heads,
     seq_len,
@@ -75,6 +76,9 @@ def _kernel_fused_attention(
     stride_oh,
     stride_os,
     stride_od,
+    stride_LSEb,
+    stride_LSEh,
+    stride_LSEs,
     BLOCK_SIZE_M: tl.constexpr,
     BLOCK_SIZE_N: tl.constexpr,
     BLOCK_DMODEL: tl.constexpr,
@@ -111,7 +115,9 @@ def _kernel_fused_attention(
     mask_q = (q_pos[:, None] < seq_len) & (d_idx[None, :] < dim)
     q_val = tl.load(q_ptr + offsets_q, mask=mask_q, other=0.0)
 
-    for start_n in range(0, seq_len, BLOCK_SIZE_N):
+    total_length = tl.minimum(start_m + BLOCK_SIZE_M, seq_len) if IS_CAUSAL else seq_len
+
+    for start_n in range(0, total_length, BLOCK_SIZE_N):
         k_pos = start_n + n_idx
         # find the K
         offset_kd = d_idx * stride_kd
@@ -166,18 +172,27 @@ def _kernel_fused_attention(
         m_i = m_new
         l_i = l_new_i
 
+    lse_i = m_i + tl.log(l_i)
     acc /= l_i[:, None]
 
     # find the V
     offset_od = d_idx * stride_od
-    offset_os = (start_m + m_idx) * stride_os
+    offset_os = q_pos * stride_os
     offset_oh = h * stride_oh
     offset_ob = b * stride_ob
 
     offsets_o = offset_ob + offset_oh + offset_os[:, None] + offset_od[None, :]
-    mask_o = ((start_m + m_idx)[:, None] < seq_len) & (d_idx[None, :] < dim)
+    mask_o = (q_pos[:, None] < seq_len) & (d_idx[None, :] < dim)
 
     tl.store(o_ptr + offsets_o, acc, mask=mask_o)
+
+    offset_LSEb = b * stride_LSEb
+    offset_LSEh = h * stride_LSEh
+    offset_LSEs = q_pos * stride_LSEs
+    offsets_LSE = offset_LSEb + offset_LSEh + offset_LSEs
+    mask_LSE = q_pos < seq_len
+
+    tl.store(LSE_ptr + offsets_LSE, lse_i, mask=mask_LSE)
 
 
 def triton_fused_attention(Q, K, V, is_causal):
@@ -222,6 +237,7 @@ def triton_fused_attention(Q, K, V, is_causal):
 
     qk_scale = 1.0 / math.sqrt(dim)
     Output = torch.empty_like(Q)
+    LSE = torch.empty((batch, num_heads, seq_len), device=Q.device, dtype=torch.float32)
 
     BLOCK_SIZE_M = 64
     grid = (
@@ -236,6 +252,7 @@ def triton_fused_attention(Q, K, V, is_causal):
         K,
         V,
         Output,
+        LSE,
         batch,
         num_heads,
         seq_len,
@@ -257,11 +274,14 @@ def triton_fused_attention(Q, K, V, is_causal):
         Output.stride(1),
         Output.stride(2),
         Output.stride(3),
+        LSE.stride(0),
+        LSE.stride(1),
+        LSE.stride(2),
         BLOCK_DMODEL=max(dim, 16),
         IS_CAUSAL=is_causal,
     )
 
-    return Output
+    return Output, LSE
 
 
 def test_dense_attention(

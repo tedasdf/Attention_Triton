@@ -8,6 +8,8 @@ services:
     volumes:
       - ./gateway:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - vllm
 
   vllm:
     build: ./vllm
@@ -27,3 +29,19 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+  
+    prometheus:
+      image: prom/prometheus:latest
+      ports:
+        - "9090:9090"
+      volumes:
+        - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      depends_on:
+        - vllm
+        
+    grafana:
+      image: grafana/grafana:latest
+      ports:
+        - "3000:3000"
+      depends_on:
+        - prometheus

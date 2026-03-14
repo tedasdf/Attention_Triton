@@ -1,5 +1,22 @@
 
 
+```
+python eval/build_eval_set.py \
+  --dataset_name openai_humaneval \
+  --split test \
+  --dataset_type humaneval \
+  --output_path artifacts/evals/humaneval.jsonl
+
+
+python build_eval_set.py \
+  --dataset_name google-research-datasets/mbpp \
+  --split test \
+  --dataset_type mbpp \
+  --output_path artifacts/evals/mbpp.jsonl
+```
+
+
+
 python eval/regression_gate.py \
   --baseline_summary eval/results/run_0001/summary.json \
   --current_summary eval/results/run_0002/summary.json \

@@ -21,6 +21,7 @@ from main.checkpoint import (
     update_run_metadata,
     write_run_metadata,
 )
+from utils.eval import evaluate_benchmark
 from model.config import GPTConfig, Hyperparameters
 from model.transformer import GPT
 from utils.data import BPETokenizer
@@ -241,6 +242,8 @@ def main(parser):
         model.eval()
         losses = 0.0
         total_tokens = 0
+
+        ## evaliuate with eval_loss
         with torch.no_grad():
             for xb, yb in iter_full_split(
                 val_ids, cfg.block_size, cfg.batch_size, device
@@ -405,6 +408,21 @@ def main(parser):
                     data_dir=data_dir,
                     tokenizer_path=tokenizer_path,
                 )
+
+            if step % cfg.benchmark_interval == 0:
+                bench_results, bench_metrics = evaluate_benchmark(model, tok, device)
+
+                print("Benchmark metrics:", bench_metrics)
+                print("Benchmark result:", bench_results)
+
+                # run_metadata["benchmark_pass_at_1"] = bench_metrics["pass_at_1"]
+                # run_metadata["benchmark_compile_rate"] = bench_metrics["compile_rate"]
+
+                # if "mbpp" in bench_metrics["by_dataset"]:
+                #     run_metadata["mbpp_pass_at_1"] = bench_metrics["by_dataset"]["mbpp"]["pass_at_1"]
+
+                # if "humaneval" in bench_metrics["by_dataset"]:
+                #     run_metadata["humaneval_pass_at_1"] = bench_metrics["by_dataset"]["humaneval"]["pass_at_1"]
 
     use_mlflow = False
     mlflow_run_id = "none"

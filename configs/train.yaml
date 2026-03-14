@@ -24,3 +24,7 @@ checkpointing:
   save_best: true
   save_step_checkpoints: true
   step_checkpoint_interval: 100
+
+
+eval:
+  eval_path:
