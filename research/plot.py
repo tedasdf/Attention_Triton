@@ -184,7 +184,9 @@ if __name__ == "__main__":
     import re
     import pandas as pd
 
-    ROOT = Path("scaling_law_download")
+    ROOT = Path(
+        r"C:\Users\teeds\Documents\GitHub\Attention_Triton\artifacts\runs\train\scaling_law_download"
+    )
 
     def parse_size_string(text: str):
         """
