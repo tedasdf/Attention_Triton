@@ -2,20 +2,20 @@
 hyperparameters:
   block_size: 64
   batch_size: 64
-  n_layer: 4
-  n_head: 4
-  d_model: 512
+  n_layer: 6
+  n_head: 6
+  d_model: 384
   d_compression: 128
   dropout: 0.1
   nb_features: 256
-  lr: 0.001         # Scientific notation (6e-3) is also supported
+  lr: 0.003         # Scientific notation (6e-3) is also supported
   weight_decay: 0.05
   evals_per_epoch: 3
   attn_type: "standard"
   epochs: 7
   seed: 1337
   log_file: "./logs/mainrun.log"
-  data_dir: "./artifacts/datasets/hn_v1"
+  data_dir: "./artifacts/datasets/hn_1M"
   output_dir: "./artifacts/runs/train"
   accumulation_steps: 4
 
@@ -25,6 +25,5 @@ checkpointing:
   save_step_checkpoints: true
   step_checkpoint_interval: 100
 
-
-eval:
-  eval_path:
+# eval:
+#   eval_path:

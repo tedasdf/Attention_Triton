@@ -21,7 +21,6 @@ from main.checkpoint import (
     update_run_metadata,
     write_run_metadata,
 )
-from utils.eval import evaluate_benchmark
 from model.config import GPTConfig, Hyperparameters
 from model.transformer import GPT
 from utils.data import BPETokenizer
@@ -238,6 +237,12 @@ def main(parser):
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
 
+    def has_nonfinite_gradients(model) -> bool:
+        for p in model.parameters():
+            if p.grad is not None and not torch.isfinite(p.grad).all():
+                return True
+        return False
+
     def evaluate():
         model.eval()
         losses = 0.0
@@ -315,20 +320,49 @@ def main(parser):
     for epoch in range(start_epoch, cfg.epochs + 1):
         for i in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
             step += 1
+
+            step_start = time.perf_counter()
+
+            data_start = time.perf_counter()
             xb, yb, ptr = get_batch(
                 train_ids, ptr, cfg.block_size, cfg.batch_size, device
             )
+            data_time = time.perf_counter() - data_start
+
+            compute_start = time.perf_counter()
             _, loss = model(xb, yb)
 
             loss.backward()
 
+            grad_norm = None
             if (i % cfg.accumulation_steps == 0) or (i == batches):
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step()
                 scheduler.step()
                 opt.zero_grad(set_to_none=True)
+            compute_time = time.perf_counter() - compute_start
 
+            step_time = time.perf_counter() - step_start
             elapsed = time.time() - t0
+
+            tokens_this_step = yb.numel()
+            samples_this_step = xb.size(0)
+            tokens_per_sec = tokens_this_step / max(step_time, 1e-8)
+            samples_per_sec = samples_this_step / max(step_time, 1e-8)
+
+            loss_is_finite = torch.isfinite(loss).item()
+            grads_are_finite = not has_nonfinite_gradients(model)
+            nan_or_inf_flag = 0 if (loss_is_finite and grads_are_finite) else 1
+
+            current_lr = opt.param_groups[0]["lr"]
+
+            if torch.cuda.is_available():
+                gpu_mem_allocated_mb = torch.cuda.memory_allocated() / (1024**2)
+                gpu_mem_reserved_mb = torch.cuda.memory_reserved() / (1024**2)
+            else:
+                gpu_mem_allocated_mb = 0.0
+                gpu_mem_reserved_mb = 0.0
+
             logger.log(
                 "training_step",
                 step=step,
@@ -338,15 +372,30 @@ def main(parser):
                 prnt=False,
             )
 
-            wandb_logger.log_metrics(
-                {"train/loss": loss, "train/epoch": epoch, "system/lr": 1e-4},
-                step=epoch,
-            )
+            wandb_metrics = {
+                "train/loss": loss.item(),
+                "train/epoch": epoch,
+                "system/lr": current_lr,
+                "runtime/step_time_sec": step_time,
+                "runtime/data_time_sec": data_time,
+                "runtime/compute_time_sec": compute_time,
+                "runtime/tokens_per_sec": tokens_per_sec,
+                "runtime/samples_per_sec": samples_per_sec,
+                "system/gpu_mem_allocated_mb": gpu_mem_allocated_mb,
+                "system/gpu_mem_reserved_mb": gpu_mem_reserved_mb,
+                "system/nan_or_inf_flag": nan_or_inf_flag,
+            }
+            if grad_norm is not None:
+                wandb_metrics["train/grad_norm"] = float(grad_norm)
+
+            wandb_logger.log_metrics(wandb_metrics, step=step)
 
             if (
                 step == 1 or step % eval_interval == 0 or step == max_steps
             ) or parser.smoke_test:
+                eval_start = time.perf_counter()
                 val_loss = evaluate()
+                eval_time = time.perf_counter() - eval_start
                 logger.log(
                     "validation_step",
                     step=step,
@@ -354,6 +403,7 @@ def main(parser):
                     loss=val_loss,
                     elapsed_time=elapsed,
                 )
+                checkpoint_start = time.perf_counter()
                 save_latest_checkpoint(
                     ckpt_cfg=ckpt_cfg,
                     checkpoints_dir=checkpoints_dir,
@@ -409,20 +459,30 @@ def main(parser):
                     tokenizer_path=tokenizer_path,
                 )
 
-            if step % cfg.benchmark_interval == 0:
-                bench_results, bench_metrics = evaluate_benchmark(model, tok, device)
+                checkpoint_time = time.perf_counter() - checkpoint_start
 
-                print("Benchmark metrics:", bench_metrics)
-                print("Benchmark result:", bench_results)
+                wandb_logger.log_metrics(
+                    {
+                        "eval/loss": val_loss,
+                        "eval/time_sec": eval_time,
+                        "checkpoint/save_time_sec": checkpoint_time,
+                    },
+                    step=step,
+                )
+            # if step % cfg.benchmark_interval == 0:
+            #     bench_results, bench_metrics = evaluate_benchmark(model, tok, device)
 
-                # run_metadata["benchmark_pass_at_1"] = bench_metrics["pass_at_1"]
-                # run_metadata["benchmark_compile_rate"] = bench_metrics["compile_rate"]
+            #     print("Benchmark metrics:", bench_metrics)
+            #     print("Benchmark result:", bench_results)
 
-                # if "mbpp" in bench_metrics["by_dataset"]:
-                #     run_metadata["mbpp_pass_at_1"] = bench_metrics["by_dataset"]["mbpp"]["pass_at_1"]
+            # run_metadata["benchmark_pass_at_1"] = bench_metrics["pass_at_1"]
+            # run_metadata["benchmark_compile_rate"] = bench_metrics["compile_rate"]
 
-                # if "humaneval" in bench_metrics["by_dataset"]:
-                #     run_metadata["humaneval_pass_at_1"] = bench_metrics["by_dataset"]["humaneval"]["pass_at_1"]
+            # if "mbpp" in bench_metrics["by_dataset"]:
+            #     run_metadata["mbpp_pass_at_1"] = bench_metrics["by_dataset"]["mbpp"]["pass_at_1"]
+
+            # if "humaneval" in bench_metrics["by_dataset"]:
+            #     run_metadata["humaneval_pass_at_1"] = bench_metrics["by_dataset"]["humaneval"]["pass_at_1"]
 
     use_mlflow = False
     mlflow_run_id = "none"
