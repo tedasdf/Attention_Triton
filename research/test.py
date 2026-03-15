@@ -1,12 +1,10 @@
 import wandb
 
 api = wandb.Api()
-run = api.run("arc_agi/ntp-transformer/72t0bjqg")
+run = api.run("arc_agi/ntp-transformer/j810jkm8")
 
-df = run.history(samples=1000)
-print(df.columns.tolist())
-
-# or for full history on large runs:
-for row in run.scan_history():
-    if "system/lr" in row:
-        print(row["system/lr"])
+for row_idx, row in enumerate(run.scan_history()):
+    if "system/nan_or_inf_flag" in row and row["system/nan_or_inf_flag"] is not None:
+        print(
+            f"row={row_idx}, _step={row.get('_step')}, system/lr={row['system/nan_or_inf_flag']}"
+        )

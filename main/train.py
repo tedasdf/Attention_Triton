@@ -344,13 +344,13 @@ def main(parser):
 
             grad_norm = None
             optimizer_updated = False
-            if (i % cfg.accumulation_steps == 0) or (i == batches):
-                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                opt.step()
-                scheduler.step()
-                opt.zero_grad(set_to_none=True)
-                optimizer_step += 1
-                optimizer_updated = True
+            # if (i % cfg.accumulation_steps == 0) or (i == batches):
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+            scheduler.step()
+            opt.zero_grad(set_to_none=True)
+            optimizer_step += 1
+            optimizer_updated = True
             compute_time = time.perf_counter() - compute_start
             step_time = time.perf_counter() - step_start
 
