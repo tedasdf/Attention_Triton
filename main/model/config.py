@@ -104,7 +104,7 @@ class GPTConfig:
     # Factory method to create from a flat dict (like your Hyperparameters)
     @classmethod
     def from_flat(cls, h: Hyperparameters):
-        if h.attn_type == "standard":
+        if h.attn_type == "standard" or h.attn_type == "flash":
             attn_cfg = StandardAttentionConfig(
                 h.attn_type,
                 h.d_model,
@@ -150,7 +150,6 @@ class GPTConfig:
                 h.dropout,
                 h.d_compression,
             )
-
         else:
             raise ValueError(f"Unknown attention type: {h.attn_type}")
 
