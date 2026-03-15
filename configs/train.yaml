@@ -16,7 +16,7 @@ hyperparameters:
   seed: 1337
   log_file: "./logs/mainrun.log"
   data_dir: "./artifacts/datasets/hn_1M"
-  output_dir: "./artifacts/runs/train"
+  output_dir: "./artifacts/runs/train/run_2026_03_15_175902'
   accumulation_steps: 4
 
 checkpointing:

@@ -309,7 +309,7 @@ def main(parser):
     start_epoch = 1
     if parser.resume:
         resume_path = (
-            output_dir / "latest.pt"
+            output_dir / "checkpoints/latest.pt"
             # if parser.resume == "latest"
             # else Path(parser.resume)
         )
