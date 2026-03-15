@@ -375,15 +375,15 @@ def main(parser):
             wandb_metrics = {
                 "train/loss": loss.item(),
                 "train/epoch": epoch,
-                "system/lr": current_lr,
+                "system/lr": float(current_lr),
                 "runtime/step_time_sec": step_time,
                 "runtime/data_time_sec": data_time,
                 "runtime/compute_time_sec": compute_time,
                 "runtime/tokens_per_sec": tokens_per_sec,
                 "runtime/samples_per_sec": samples_per_sec,
-                "system/gpu_mem_allocated_mb": gpu_mem_allocated_mb,
-                "system/gpu_mem_reserved_mb": gpu_mem_reserved_mb,
-                "system/nan_or_inf_flag": nan_or_inf_flag,
+                "system/gpu_mem_allocated_mb": float(gpu_mem_allocated_mb),
+                "system/gpu_mem_reserved_mb": float(gpu_mem_reserved_mb),
+                "system/nan_or_inf_flag": int(nan_or_inf_flag),
             }
             if grad_norm is not None:
                 wandb_metrics["train/grad_norm"] = float(grad_norm)
