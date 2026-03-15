@@ -32,6 +32,8 @@ class Hyperparameters:
     n_kv_heads: int = 16
     linformer_k: int = 32
 
+    causal: bool = True
+
 
 @dataclass
 class BaseAttentionConfig:
