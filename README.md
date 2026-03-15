@@ -167,3 +167,14 @@ The observability work in this repo is intended to support:
 - add run summaries for throughput and timing
 - validate checkpoint and resume behavior under interruption
 - write benchmark reports identifying likely bottlenecks
+
+
+How long is each step taking?
+
+How many tokens/sec am I getting?
+
+Is the GPU actually busy?
+
+Is it waiting for data?
+
+Is memory stable over time?
