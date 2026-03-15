@@ -293,7 +293,7 @@ def main(parser):
     optimizer_step = 0
     best_val_loss = float("inf")
     nonfinite_events_total = 0
-    t0 = time.time()
+    t0 = time.perf_counter()
 
     save_config_snapshot(parser.config_path, run_dir)
     write_run_metadata(
@@ -381,9 +381,10 @@ def main(parser):
                 gpu_peak_allocated_mb = 0.0
                 gpu_peak_reserved_mb = 0.0
 
+            elapsed_time = time.perf_counter() - t0
             train_metrics = {
                 "epoch": int(epoch),
-                # Training health
+                # Research
                 "train/loss": float(loss.item()),
                 "train/epoch": int(epoch),
                 # Runtime throughput
@@ -398,6 +399,7 @@ def main(parser):
                 "runtime/gpu_mem_reserved_mb": float(gpu_mem_reserved_mb),
                 "runtime/gpu_peak_allocated_mb": float(gpu_peak_allocated_mb),
                 "runtime/gpu_peak_reserved_mb": float(gpu_peak_reserved_mb),
+                "runtime/elapsed_Time_sec": float(elapsed_time),
                 "health/nan_or_inf_flag": int(nan_or_inf_flag),
                 "health/nonfinite_events_total": int(nonfinite_events_total),
                 # Debugging counters
@@ -406,7 +408,7 @@ def main(parser):
             }
 
             if grad_norm is not None:
-                train_metrics["train/grad_norm"] = float(grad_norm)
+                train_metrics["health/grad_norm"] = float(grad_norm)
 
             wandb_logger.log_metrics(train_metrics, step=global_step)
 
