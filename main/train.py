@@ -309,9 +309,9 @@ def main(parser):
     start_epoch = 1
     if parser.resume:
         resume_path = (
-            checkpoints_dir / "latest.pt"
-            if parser.resume == "latest"
-            else Path(parser.resume)
+            cfg.output_dir / "latest.pt"
+            # if parser.resume == "latest"
+            # else Path(parser.resume)
         )
         state = load_checkpoint(
             path=resume_path,
