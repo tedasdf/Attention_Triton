@@ -354,7 +354,7 @@ def main(parser):
             grads_are_finite = not has_nonfinite_gradients(model)
             nan_or_inf_flag = 0 if (loss_is_finite and grads_are_finite) else 1
 
-            current_lr = opt.param_groups[0]["lr"]
+            current_lr = scheduler.get_last_lr()[0]
 
             if torch.cuda.is_available():
                 gpu_mem_allocated_mb = torch.cuda.memory_allocated() / (1024**2)
