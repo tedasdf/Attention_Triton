@@ -131,3 +131,24 @@ def write_done(stage: str, stage_dir: str, meta: dict | None = None):
 
 def is_done(stage_dir: str) -> bool:
     return os.path.exists(done_path(stage_dir))
+
+
+def _append_jsonl(path: str, payload: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload) + "\n")
+
+
+def log_preprocess_metrics(metrics_path: str, payload: dict) -> None:
+    payload = dict(payload)
+    payload["timestamp_unix"] = time.time()
+    _append_jsonl(metrics_path, payload)
+
+
+def _maybe_count_rows(ds):
+    if ds is None or not hasattr(ds, "count"):
+        return None, 0.0
+    t0 = time.perf_counter()
+    rows = int(ds.count())
+    dt = time.perf_counter() - t0
+    return rows, dt
