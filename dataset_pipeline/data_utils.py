@@ -85,6 +85,7 @@ def require_stage_output(stage: str, stage_out_dir: str):
             f"Stage '{stage}' output missing at: {stage_out_dir}\n"
             f"Enable stages.{stage}: true or run that stage first."
         )
+    print(f"Stage '{stage}' output at: {stage_out_dir}")
 
 
 def preflight(cfg, stage_paths: dict[str, str]):
