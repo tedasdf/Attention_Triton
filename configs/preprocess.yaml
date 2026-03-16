@@ -4,7 +4,7 @@ run:
   version: "v0001"
   ray_init_kwargs: {"num_cpus": 12, "object_store_memory": 2000000000}
   stages: ["cluster_map" ,"snapshot", "split"] # "canonicalize" ,"minhash", "pairs", "cluster_map" ,"snapshot"]  # optional override
-  input_dir: "./artifacts/runs/preprocess/20260307_120249_909c779/stages/"
+  input_dir: "./artifacts/runs/preprocess/20260307_120249_909c779/"
   output_dir: "./artifacts/runs/preprocess"
 
 canonicalize:
