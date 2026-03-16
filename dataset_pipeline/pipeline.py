@@ -367,4 +367,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    data_preprocess(cfg_path=args.config, resume=args.resume)
+    data_preprocess(cfg_path=args.config)
