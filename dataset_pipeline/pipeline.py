@@ -139,7 +139,7 @@ def data_preprocess(cfg_path: str):
     )
     print("run_dir:", ctx.run_dir)
 
-    stage_paths = set_up(os.path.join(ctx.run_dir, "stages"))
+    stage_paths = set_up(os.path.join(cfg.input_dir, "stages"))
     preflight(cfg, stage_paths)
 
     reports_dir = os.path.join(ctx.run_dir, "reports")
