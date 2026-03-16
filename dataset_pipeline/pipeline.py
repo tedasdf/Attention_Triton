@@ -127,7 +127,7 @@ def run_or_load_observed(
     return ds, rows, stage_time
 
 
-def data_preprocess(cfg_path: str, resume: bool):
+def data_preprocess(cfg_path: str):
     run_t0 = time.perf_counter()
     cfg = load_pipeline_config(cfg_path)
 
@@ -135,7 +135,6 @@ def data_preprocess(cfg_path: str, resume: bool):
         phase="preprocess",
         config_path=cfg_path,
         dataset_version_id=cfg.run.version,
-        resume=resume,
         extras={"stages": cfg.run.stages},
     )
     print("run_dir:", ctx.run_dir)
