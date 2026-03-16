@@ -62,6 +62,7 @@ def parquet_exists(dir_path: str) -> bool:
     True if directory contains any parquet files (including nested).
     Ray writes directories with part files; we just need to detect presence.
     """
+    print("hahahhaha")
     if not dir_path or not os.path.exists(dir_path):
         print("not dir_path", not dir_path)
         print("not path exist", not os.path.exists(dir_path))
