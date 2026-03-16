@@ -49,9 +49,23 @@ def start_run(
     phase: str,
     config_path: str,
     dataset_version_id: Optional[str] = None,
+    resume: bool = False,
     artifacts_root: str = "artifacts",
     extras: Optional[Dict[str, Any]] = None,
 ) -> ContextResult:
+    if resume:
+        run_id = dataset_version_id
+        run_dir = os.path.join(artifacts_root, "runs", phase, run_id)
+        config_snapshot_path = os.path.join(run_dir, "config.snapshot.yaml")
+        manifest_path = os.path.join(run_dir, "manifest.json")
+
+        return ContextResult(
+            run_id=run_id,
+            run_dir=run_dir,
+            config_snapshot_path=config_snapshot_path,
+            manifest_path=manifest_path,
+        )
+
     # 1) Create a unique run_id (timestamp + short git hash if available)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     git_commit = _safe_run(["git", "rev-parse", "HEAD"])

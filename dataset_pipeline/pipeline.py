@@ -127,7 +127,7 @@ def run_or_load_observed(
     return ds, rows, stage_time
 
 
-def data_preprocess(cfg_path=r"configs/preprocess.yaml"):
+def data_preprocess(cfg_path: str, resume: bool):
     run_t0 = time.perf_counter()
     cfg = load_pipeline_config(cfg_path)
 
@@ -135,6 +135,7 @@ def data_preprocess(cfg_path=r"configs/preprocess.yaml"):
         phase="preprocess",
         config_path=cfg_path,
         dataset_version_id=cfg.run.version,
+        resume=resume,
         extras={"stages": cfg.run.stages},
     )
     print("run_dir:", ctx.run_dir)
@@ -364,6 +365,10 @@ if __name__ == "__main__":
         description="Run the Ray data preprocessing pipeline."
     )
     parser.add_argument("--config", type=str, default=r"configs/preprocess.yaml")
+    parser.add_argument(
+        "--resume", action="store_true", help="Resume previously stored checkpoint"
+    )
+
     args = parser.parse_args()
 
-    data_preprocess(cfg_path=args.config)
+    data_preprocess(cfg_path=args.config, resume=args.resume)
