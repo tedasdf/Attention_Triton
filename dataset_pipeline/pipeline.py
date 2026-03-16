@@ -364,9 +364,6 @@ if __name__ == "__main__":
         description="Run the Ray data preprocessing pipeline."
     )
     parser.add_argument("--config", type=str, default=r"configs/preprocess.yaml")
-    parser.add_argument(
-        "--resume", action="store_true", help="Resume previously stored checkpoint"
-    )
 
     args = parser.parse_args()
 
