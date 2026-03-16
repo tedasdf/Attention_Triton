@@ -63,9 +63,10 @@ def parquet_exists(dir_path: str) -> bool:
     Ray writes directories with part files; we just need to detect presence.
     """
     print("hahahhaha")
+
+    print("not dir_path", not dir_path)
+    print("not path exist", not os.path.exists(dir_path))
     if not dir_path or not os.path.exists(dir_path):
-        print("not dir_path", not dir_path)
-        print("not path exist", not os.path.exists(dir_path))
         return False
     # check for *.parquet anywhere under the directory
     return len(glob.glob(os.path.join(dir_path, "**", "*.parquet"), recursive=True)) > 0
