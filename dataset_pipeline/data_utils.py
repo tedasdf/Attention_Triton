@@ -62,10 +62,7 @@ def parquet_exists(dir_path: str) -> bool:
     True if directory contains any parquet files (including nested).
     Ray writes directories with part files; we just need to detect presence.
     """
-    print("hahahhaha")
 
-    print("not dir_path", not dir_path)
-    print("not path exist", not os.path.exists(dir_path))
     if not dir_path or not os.path.exists(dir_path):
         return False
     # check for *.parquet anywhere under the directory
@@ -85,13 +82,11 @@ def require_input_dir(input_dir: str):
 
 def require_stage_output(stage: str, stage_out_dir: str):
     path_len = parquet_exists(stage_out_dir)
-    print(path_len)
     if not path_len:
         raise FileNotFoundError(
             f"Stage '{stage}' output missing at: {stage_out_dir}\n"
             f"Enable stages.{stage}: true or run that stage first."
         )
-    print(f"Stage '{stage}' output at: {stage_out_dir}")
 
 
 def preflight(cfg, stage_paths: dict[str, str]):

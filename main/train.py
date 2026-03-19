@@ -229,7 +229,11 @@ def main(parser):
 
     model_cfg = GPTConfig.from_flat(cfg)
     model = GPT(model_cfg).to(device)
-    model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model_params = int(sum(p.numel() for p in model.parameters()))
+    trainable_model_params = int(
+        sum(p.numel() for p in model.parameters() if p.requires_grad)
+    )
+
     logger.log("model_info", parameters_count=model_params)
 
     opt = torch.optim.AdamW(
@@ -262,13 +266,15 @@ def main(parser):
         model.train()
         return losses / total_tokens  # if total_tokens > 0 else float("inf")
 
+    wandb_cfg = OmegaConf.to_container(cfg, resolve=True)
+    wandb_cfg["model_params"] = model_params
+    wandb_cfg["trainable_model_params"] = trainable_model_params
+
     if parser.sweep:
         wandb.init(project=parser.wandb_project)
         configure_wandb_metrics()
 
-        wandb.config.update(
-            OmegaConf.to_container(cfg, resolve=True), allow_val_change=True
-        )
+        wandb.config.update(wandb_cfg, allow_val_change=True)
 
         class SweepLogger:
             def log_metrics(self, metrics, step=None):
@@ -284,7 +290,7 @@ def main(parser):
     else:
         wandb_logger = WandbLogger(
             project=parser.wandb_project,
-            config=OmegaConf.to_container(cfg, resolve=True),
+            config=wandb_cfg,
             enabled=not parser.smoke_test,
         )
 
@@ -585,7 +591,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="ntp-transformer",
+        default="scaling_law",
         help="W&B project name",
     )
 

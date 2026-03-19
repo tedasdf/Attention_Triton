@@ -178,3 +178,42 @@ Is the GPU actually busy?
 Is it waiting for data?
 
 Is memory stable over time?
+
+
+
+
+
+
+
+
+
+1) imrpvoe the latency 
+
+2) logged ion the time for each training stage already \
+
+3) increase parameter and show how that increase training
+
+4) opimise the training ( 1.5/ 2 days) -22
+
+5) have dataset ready gonna use olmo dataset (concurrent with 4)
+
+6) function for getting different training sizes I want (22 nogjt)
+
+[use only full attetnion ]
+7) saling law replicating the resolving discrepancies in computeoptimalk scaling in language model paper (3 days) 26
+
+
+8) have fiunction to map the cost of each sweep or each scaling law  ( with step 7)
+
+[test acroiss thgree acthiecture ]
+9) test acrosss different architecture 
+27-29
+
+
+[integrat with the paper about constatn learnign rate and cosine ]
+10) 
+29 
+
+
+
+optimise  data pipeline 30-32 
