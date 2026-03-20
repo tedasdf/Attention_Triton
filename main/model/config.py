@@ -26,7 +26,6 @@ class Hyperparameters:
     dropout: float = 0.1
 
     mlp_type: str = "standard"
-
     is_RoPE: bool = False
 
     # nb_features: int = 256

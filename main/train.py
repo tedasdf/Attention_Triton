@@ -245,17 +245,6 @@ def main(parser):
     steps_per_epoch = max(
         1, math.ceil(batches / cfg.accumulation_steps)
     )  # optimizer steps per epoch
-    max_steps = cfg.epochs * steps_per_epoch
-    eval_interval = max(1, batches // cfg.evals_per_epoch)
-
-    logger.log(
-        "dataset_info",
-        train_tokens=len(train_ids),
-        val_tokens=len(val_ids),
-        epochs=cfg.epochs,
-        batches_per_epoch=batches,
-        vocab_size=tok.vocab_size,
-    )
 
     model_cfg = GPTConfig.from_flat(cfg)
     model = GPT(model_cfg).to(device)
@@ -267,6 +256,17 @@ def main(parser):
     target_train_tokens = 20 * model_params
     tokens_per_epoch = len(train_ids)
     cfg.epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
+    max_steps = cfg.epochs * steps_per_epoch
+    eval_interval = max(1, batches // cfg.evals_per_epoch)
+
+    logger.log(
+        "dataset_info",
+        train_tokens=len(train_ids),
+        val_tokens=len(val_ids),
+        epochs=cfg.epochs,
+        batches_per_epoch=batches,
+        vocab_size=tok.vocab_size,
+    )
 
     logger.log(
         "training_budget",
