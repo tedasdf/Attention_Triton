@@ -1,33 +1,36 @@
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import itertools
 
+import numpy as np
 from datasets import load_dataset
 from omegaconf import OmegaConf
 from tokenizers import Tokenizer
-import torch
 from tokenizers import models, trainers, pre_tokenizers, decoders
 
 
 @dataclass
 class DatasetConfig:
     source_type: str = "huggingface"
-    dataset_name: str = "julien040/hacker-news-posts"
+    dataset_name: str = "tiiuae/falcon-refinedweb"
     dataset_split: str = "train"
-    text_field: str = "title"
-    output_dir: str = "artifacts/datasets/hn_v1"
+    text_field: str = "content"
+    output_dir: str = "artifacts/datasets/refinedweb"
     cache_dir: str = "data/hf_cache"
-    num_samples: int = 100000
+    target_train_tokens: int = 50_000_000
+    target_val_tokens: int = 5_000_000
     seed: int = 1337
-    val_frac: float = 0.1
+    shuffle_buffer_size: int = 10_000
+    tokenizer_train_samples: int = 200_000
 
 
 @dataclass
 class TokenizerConfig:
-    vocab_size: int = 16000
+    vocab_size: int = 50432
     eos_token: str = "<eos>"
     unk_token: str = "<unk>"
-    reuse_existing: bool = True
+    reuse_existing: bool = False
     vocab_filename: str = "vocab.json"
 
 
@@ -40,14 +43,21 @@ class AppConfig:
 class BPETokenizer:
     def __init__(self, tokenizer: Tokenizer):
         self.tk = tokenizer
-        self.stoi = {tok: i for tok, i in tokenizer.get_vocab().items()}
-        self.itos = {i: tok for tok, i in tokenizer.get_vocab().items()}
+        vocab = tokenizer.get_vocab()
+        self.stoi = vocab
+        self.itos = {i: tok for tok, i in vocab.items()}
 
     def encode(self, s: str) -> list[int]:
         return self.tk.encode(s).ids
 
     def decode(self, ids: list[int]) -> str:
         return self.tk.decode(ids, skip_special_tokens=True)
+
+    def token_to_id(self, token: str) -> int:
+        token_id = self.tk.token_to_id(token)
+        if token_id is None:
+            raise ValueError(f"Token not found in tokenizer vocab: {token}")
+        return token_id
 
     @property
     def vocab_size(self):
@@ -62,7 +72,7 @@ class BPETokenizer:
 
 
 def train_tokenizer(
-    titles: list[str],
+    text_iterator,
     vocab_size: int,
     unk_token: str = "<unk>",
     pad_token: str = "<pad>",
@@ -75,7 +85,7 @@ def train_tokenizer(
         vocab_size=vocab_size,
         special_tokens=[pad_token, eos_token, unk_token],
     )
-    tokenizer.train_from_iterator(titles, trainer)
+    tokenizer.train_from_iterator(text_iterator, trainer=trainer)
     return tokenizer
 
 
@@ -89,73 +99,6 @@ def load_config(config_path: str) -> AppConfig:
         dataset=DatasetConfig(**cfg_dict["dataset"]),
         tokenizer=TokenizerConfig(**cfg_dict["tokenizer"]),
     )
-
-
-def download_and_preprocess_huggingface_dataset(
-    cfg: DatasetConfig,
-    smoke_test: bool = False,
-) -> tuple[list[str], list[str]]:
-    if cfg.source_type != "huggingface":
-        raise ValueError(f"Expected source_type='huggingface', got {cfg.source_type}")
-
-    streaming = not smoke_test
-
-    ds = load_dataset(
-        cfg.dataset_name,
-        split=cfg.dataset_split,
-        streaming=streaming,
-    )
-
-    ds = ds.shuffle(seed=cfg.seed, buffer_size=10_000)
-
-    num_samples = 100 if smoke_test else cfg.num_samples
-    sampled_rows = list(ds.take(num_samples))
-
-    titles = [
-        row[cfg.text_field].strip()
-        for row in sampled_rows
-        if row.get(cfg.text_field) and row[cfg.text_field].strip()
-    ]
-
-    n_train = int(len(titles) * (1 - cfg.val_frac))
-    return titles[:n_train], titles[n_train:]
-
-
-def write_dataset_metadata(
-    cfg: DatasetConfig,
-    tokenizer_cfg: TokenizerConfig,
-    train_samples: list[str],
-    val_samples: list[str],
-    train_char_count: int,
-    val_char_count: int,
-    train_token_count: int,
-    val_token_count: int,
-    output_dir: Path,
-) -> None:
-    metadata = {
-        "dataset_name": cfg.dataset_name,
-        "source_type": cfg.source_type,
-        "dataset_split": cfg.dataset_split,
-        "text_field": cfg.text_field,
-        "seed": cfg.seed,
-        "val_frac": cfg.val_frac,
-        "train_samples": len(train_samples),
-        "val_samples": len(val_samples),
-        "train_chars": train_char_count,
-        "val_chars": val_char_count,
-        "train_tokens": train_token_count,
-        "val_tokens": val_token_count,
-        "tokenizer": {
-            "vocab_size": tokenizer_cfg.vocab_size,
-            "eos_token": tokenizer_cfg.eos_token,
-            "reuse_existing": tokenizer_cfg.reuse_existing,
-            "vocab_filename": tokenizer_cfg.vocab_filename,
-        },
-    }
-
-    metadata_path = output_dir / "metadata.json"
-    with metadata_path.open("w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
 
 
 def resolve_config_paths(config_path: str) -> list[Path]:
@@ -184,6 +127,194 @@ def resolve_config_paths(config_path: str) -> list[Path]:
     raise ValueError(f"Unsupported config path: {path}")
 
 
+def iter_huggingface_texts(
+    cfg: DatasetConfig,
+    seed: int,
+    smoke_test: bool = False,
+):
+    if cfg.source_type != "huggingface":
+        raise ValueError(f"Expected source_type='huggingface', got {cfg.source_type}")
+
+    ds = load_dataset(
+        cfg.dataset_name,
+        split=cfg.dataset_split,
+        streaming=True,
+        cache_dir=cfg.cache_dir,
+    )
+
+    ds = ds.shuffle(seed=seed, buffer_size=cfg.shuffle_buffer_size)
+
+    max_docs = 1000 if smoke_test else None
+
+    for i, row in enumerate(ds):
+        if max_docs is not None and i >= max_docs:
+            break
+
+        text = row.get(cfg.text_field)
+        if not text:
+            continue
+
+        text = text.strip()
+        if not text:
+            continue
+
+        yield text
+
+
+def choose_bin_dtype(vocab_size: int):
+    if vocab_size <= np.iinfo(np.uint16).max:
+        return np.uint16
+    if vocab_size <= np.iinfo(np.uint32).max:
+        return np.uint32
+    raise ValueError("Vocab too large for uint32 token storage.")
+
+
+def train_or_load_tokenizer(
+    dataset_cfg: DatasetConfig,
+    tokenizer_cfg: TokenizerConfig,
+    output_dir: Path,
+    smoke_test: bool,
+) -> BPETokenizer:
+    vocab_path = output_dir / tokenizer_cfg.vocab_filename
+
+    if tokenizer_cfg.reuse_existing and vocab_path.exists():
+        tok = BPETokenizer.load(vocab_path)
+        print(f"Loaded existing tokenizer from: {vocab_path}")
+        return tok
+
+    train_samples = 5_000 if smoke_test else dataset_cfg.tokenizer_train_samples
+
+    text_iter = itertools.islice(
+        iter_huggingface_texts(
+            dataset_cfg,
+            seed=dataset_cfg.seed,
+            smoke_test=smoke_test,
+        ),
+        train_samples,
+    )
+
+    vocab = train_tokenizer(
+        text_iter,
+        tokenizer_cfg.vocab_size,
+        unk_token=tokenizer_cfg.unk_token,
+        eos_token=tokenizer_cfg.eos_token,
+    )
+    tok = BPETokenizer(vocab)
+    tok.save(vocab_path)
+    print(f"Saved tokenizer to: {vocab_path}")
+    print(f"Tokenizer trained on up to {train_samples:,} streamed documents.")
+    return tok
+
+
+def write_dataset_metadata(
+    cfg: DatasetConfig,
+    tokenizer_cfg: TokenizerConfig,
+    output_dir: Path,
+    stats: dict,
+    bin_dtype: str,
+) -> None:
+    metadata = {
+        "dataset_name": cfg.dataset_name,
+        "source_type": cfg.source_type,
+        "dataset_split": cfg.dataset_split,
+        "text_field": cfg.text_field,
+        "seed": cfg.seed,
+        "shuffle_buffer_size": cfg.shuffle_buffer_size,
+        "target_train_tokens": cfg.target_train_tokens,
+        "target_val_tokens": cfg.target_val_tokens,
+        "tokenizer_train_samples": cfg.tokenizer_train_samples,
+        "actual_train_samples": stats["train_samples"],
+        "actual_val_samples": stats["val_samples"],
+        "actual_train_chars": stats["train_chars"],
+        "actual_val_chars": stats["val_chars"],
+        "actual_train_tokens": stats["train_tokens"],
+        "actual_val_tokens": stats["val_tokens"],
+        "bin_dtype": bin_dtype,
+        "tokenizer": {
+            "vocab_size": tokenizer_cfg.vocab_size,
+            "eos_token": tokenizer_cfg.eos_token,
+            "unk_token": tokenizer_cfg.unk_token,
+            "reuse_existing": tokenizer_cfg.reuse_existing,
+            "vocab_filename": tokenizer_cfg.vocab_filename,
+        },
+    }
+
+    metadata_path = output_dir / "metadata.json"
+    with metadata_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+
+
+def encode_and_write_bins(
+    dataset_cfg: DatasetConfig,
+    tokenizer_cfg: TokenizerConfig,
+    tok: BPETokenizer,
+    output_dir: Path,
+    smoke_test: bool,
+) -> dict:
+    train_target = (
+        min(dataset_cfg.target_train_tokens, 100_000)
+        if smoke_test
+        else dataset_cfg.target_train_tokens
+    )
+    val_target = (
+        min(dataset_cfg.target_val_tokens, 20_000)
+        if smoke_test
+        else dataset_cfg.target_val_tokens
+    )
+
+    train_bin_path = output_dir / "train.bin"
+    val_bin_path = output_dir / "val.bin"
+
+    eos_id = tok.token_to_id(tokenizer_cfg.eos_token)
+    bin_dtype = choose_bin_dtype(tok.vocab_size)
+
+    stats = {
+        "train_samples": 0,
+        "val_samples": 0,
+        "train_chars": 0,
+        "val_chars": 0,
+        "train_tokens": 0,
+        "val_tokens": 0,
+    }
+
+    text_iter = iter_huggingface_texts(
+        dataset_cfg,
+        seed=dataset_cfg.seed + 1,
+        smoke_test=smoke_test,
+    )
+
+    with train_bin_path.open("wb") as f_train, val_bin_path.open("wb") as f_val:
+        for text in text_iter:
+            ids = tok.encode(text)
+            ids.append(eos_id)
+
+            arr = np.asarray(ids, dtype=bin_dtype)
+            n_tokens = int(arr.size)
+            n_chars = len(text) + len(tokenizer_cfg.eos_token)
+
+            if stats["val_tokens"] < val_target:
+                arr.tofile(f_val)
+                stats["val_tokens"] += n_tokens
+                stats["val_chars"] += n_chars
+                stats["val_samples"] += 1
+                continue
+
+            if stats["train_tokens"] < train_target:
+                arr.tofile(f_train)
+                stats["train_tokens"] += n_tokens
+                stats["train_chars"] += n_chars
+                stats["train_samples"] += 1
+
+            if (
+                stats["train_tokens"] >= train_target
+                and stats["val_tokens"] >= val_target
+            ):
+                break
+
+    stats["bin_dtype"] = np.dtype(bin_dtype).name
+    return stats
+
+
 def run_single_config(config_path: Path, smoke_test: bool) -> None:
     print("\n" + "=" * 80)
     print(f"Running config: {config_path}")
@@ -196,66 +327,47 @@ def run_single_config(config_path: Path, smoke_test: bool) -> None:
     output_dir = Path(dataset_cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if dataset_cfg.source_type == "huggingface":
-        train_titles, val_titles = download_and_preprocess_huggingface_dataset(
-            dataset_cfg,
-            smoke_test=smoke_test,
-        )
-    else:
-        raise NotImplementedError(
-            f"source_type '{dataset_cfg.source_type}' is not implemented yet."
-        )
+    print(f"Output dir:            {output_dir}")
+    print(f"Target train tokens:   {dataset_cfg.target_train_tokens:,}")
+    print(f"Target val tokens:     {dataset_cfg.target_val_tokens:,}")
+    print(f"Tokenizer vocab size:  {tokenizer_cfg.vocab_size:,}")
 
-    print(f"Output dir:     {output_dir}")
-    print(f"Train samples:  {len(train_titles)}")
-    print(f"Val samples:    {len(val_titles)}")
+    tok = train_or_load_tokenizer(
+        dataset_cfg,
+        tokenizer_cfg,
+        output_dir,
+        smoke_test=smoke_test,
+    )
 
-    eos_token = tokenizer_cfg.eos_token
-    vocab_path = output_dir / tokenizer_cfg.vocab_filename
-
-    if tokenizer_cfg.reuse_existing and vocab_path.exists():
-        tok = BPETokenizer.load(vocab_path)
-        print(f"Loaded existing tokenizer from: {vocab_path}")
-    else:
-        vocab = train_tokenizer(
-            train_titles,
-            tokenizer_cfg.vocab_size,
-            unk_token=tokenizer_cfg.unk_token,
-            eos_token=eos_token,
-        )
-        tok = BPETokenizer(vocab)
-        tok.save(vocab_path)
-        print(f"Saved tokenizer to: {vocab_path}")
-
-    train_text = eos_token.join(train_titles) + eos_token
-    val_text = eos_token.join(val_titles) + eos_token
-
-    train_ids = torch.tensor(tok.encode(train_text), dtype=torch.long)
-    val_ids = torch.tensor(tok.encode(val_text), dtype=torch.long)
-
-    train_bin_path = output_dir / "train.bin"
-    val_bin_path = output_dir / "val.bin"
-    train_ids.numpy().tofile(train_bin_path)
-    val_ids.numpy().tofile(val_bin_path)
+    stats = encode_and_write_bins(
+        dataset_cfg,
+        tokenizer_cfg,
+        tok,
+        output_dir,
+        smoke_test=smoke_test,
+    )
 
     write_dataset_metadata(
         dataset_cfg,
         tokenizer_cfg,
-        train_titles,
-        val_titles,
-        len(train_text),
-        len(val_text),
-        len(train_ids),
-        len(val_ids),
         output_dir,
+        stats,
+        stats["bin_dtype"],
     )
 
-    print(f"Saved metadata to: {output_dir / 'metadata.json'}")
-    print(f"Train tokens:      {len(train_ids)}")
-    print(f"Val tokens:        {len(val_ids)}")
+    print(f"Saved metadata to:     {output_dir / 'metadata.json'}")
+    print(f"Actual train samples:  {stats['train_samples']:,}")
+    print(f"Actual val samples:    {stats['val_samples']:,}")
+    print(f"Actual train tokens:   {stats['train_tokens']:,}")
+    print(f"Actual val tokens:     {stats['val_tokens']:,}")
+    print(f"Token bin dtype:       {stats['bin_dtype']}")
 
-    avg_tokens_per_title = len(train_ids) / len(train_titles) if train_titles else 0.0
-    print(f"Average tokens/title: {avg_tokens_per_title:.4f}")
+    avg_train_tokens = (
+        stats["train_tokens"] / stats["train_samples"]
+        if stats["train_samples"] > 0
+        else 0.0
+    )
+    print(f"Average train tokens/sample: {avg_train_tokens:.4f}")
 
 
 def main(parser) -> None:

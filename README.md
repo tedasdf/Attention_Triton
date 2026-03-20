@@ -187,7 +187,7 @@ Is memory stable over time?
 
 
 
-1) imrpvoe the latency ( on to this : 1) 
+1) imrpvoe the latency ( on to this : 1)  <----- 
 
 2) logged ion the time for each training stage already \
 

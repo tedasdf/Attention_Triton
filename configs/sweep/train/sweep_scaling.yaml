@@ -16,7 +16,6 @@ parameters:
       - configs/sweep/train/model_size/model_small.yaml
       - configs/sweep/train/model_size/model_base.yaml
       - configs/sweep/train/model_size/model_large.yaml
-      - configs/sweep/train/model_size/model_xlarge.yaml
 
   data_dir:
     values:

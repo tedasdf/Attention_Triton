@@ -1,6 +1,6 @@
 # configs/train/model_25m.yaml
 hyperparameters:
-  block_size: 64
+  block_size: 2048
   batch_size: 64
 
   # ~25M-ish model preset

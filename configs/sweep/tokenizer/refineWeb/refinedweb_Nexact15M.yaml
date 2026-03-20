@@ -3,13 +3,13 @@ dataset:
   dataset_name: tiiuae/falcon-refinedweb
   dataset_split: train
   text_field: content
-  output_dir: artifacts/datasets/refinedweb_kaplan_50ks
-  num_samples: 50000000
+  output_dir: artifacts/datasets/refinedweb_Nexact15M
   seed: 1337
-  val_frac: 0.1
-
+  target_train_tokens: 311951360
+  target_val_tokens: 5000000
 tokenizer:
-  vocab_size: 50257
-  eos_token: "<eos>"
+  vocab_size: 50432
+  eos_token: <eos>
+  unk_token: <unk>
   reuse_existing: false
   vocab_filename: vocab.json

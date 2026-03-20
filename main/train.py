@@ -214,8 +214,13 @@ def main(parser):
             dataset_metadata = json.load(f)
         logger.log("dataset_metadata_loaded", **dataset_metadata)
 
-    batches = len(train_ids) // (cfg.block_size * cfg.batch_size)
-    max_steps = cfg.epochs * batches
+    batches = len(train_ids) // (
+        cfg.block_size * cfg.batch_size
+    )  # micro-batches per epoch
+    steps_per_epoch = max(
+        1, math.ceil(batches / cfg.accumulation_steps)
+    )  # optimizer steps per epoch
+    max_steps = cfg.epochs * steps_per_epoch
     eval_interval = max(1, batches // cfg.evals_per_epoch)
 
     logger.log(
@@ -237,9 +242,35 @@ def main(parser):
     logger.log("model_info", parameters_count=model_params)
 
     opt = torch.optim.AdamW(
-        model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
+        model.parameters(), lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.weight_decay
     )
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_steps)
+
+    warmup_steps = cfg.warmup
+    cosine_steps = max(1, max_steps - warmup_steps)
+
+    scheduler_decay = torch.optim.lr_scheduler.CosineAnnealingLR(
+        opt, T_max=cosine_steps
+    )
+
+    scheduler_warmup = torch.optim.lr_scheduler.LinearLR(
+        opt,
+        start_factor=1e-8,
+        end_factor=1.0,
+        total_iters=warmup_steps,
+    )
+
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        opt,
+        schedulers=[scheduler_warmup, scheduler_decay],
+        milestones=[warmup_steps],
+    )
+
+    use_bf16 = (
+        device.type == "cuda"
+        and getattr(cfg, "use_bfloat16", False)
+        and torch.cuda.is_bf16_supported()
+    )
+    torch.set_float32_matmul_precision("high")
 
     def has_nonfinite_gradients(model) -> bool:
         for p in model.parameters():
@@ -257,9 +288,14 @@ def main(parser):
             for xb, yb in iter_full_split(
                 val_ids, cfg.block_size, cfg.batch_size, device
             ):
-                logits, _ = model(xb, yb)
+                with torch.autocast(
+                    device_type=device.type, dtype=torch.bfloat16, enabled=use_bf16
+                ):
+                    logits, _ = model(xb, yb)
                 B, T, V = logits.size()
-                loss = F.cross_entropy(logits.view(-1, V), yb.view(-1), reduction="sum")
+                loss = F.cross_entropy(
+                    logits.float().view(-1, V), yb.view(-1), reduction="sum"
+                )
                 losses += loss.item()
                 total_tokens += yb.numel()
 
@@ -310,6 +346,7 @@ def main(parser):
         dataset_metadata_path=metadata_path,
         hyperparameters=OmegaConf.to_container(cfg, resolve=True),
     )
+
     best_val_loss = float("inf")
 
     start_epoch = 1
@@ -323,7 +360,7 @@ def main(parser):
             path=resume_path,
             model=model,
             opt=opt,
-            scheduler=scheduler,
+            scheduler=scheduler_decay,
             device=device,
         )
         start_epoch = state["epoch"]
@@ -344,12 +381,15 @@ def main(parser):
             data_time = time.perf_counter() - data_start
 
             compute_start = time.perf_counter()
-            _, loss = model(xb, yb)
-
+            with torch.autocast(
+                device_type=device.type, dtype=torch.bfloat16, enabled=use_bf16
+            ):
+                _, loss = model(xb, yb)
             loss.backward()
 
             grad_norm = None
             optimizer_updated = False
+
             if (i % cfg.accumulation_steps == 0) or (i == batches):
                 grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step()
@@ -357,6 +397,7 @@ def main(parser):
                 opt.zero_grad(set_to_none=True)
                 optimizer_step += 1
                 optimizer_updated = True
+
             compute_time = time.perf_counter() - compute_start
             step_time = time.perf_counter() - step_start
 
@@ -443,7 +484,7 @@ def main(parser):
                     checkpoints_dir=checkpoints_dir,
                     model=model,
                     opt=opt,
-                    scheduler=scheduler,
+                    scheduler=scheduler_decay,
                     epoch=epoch,
                     step=global_step,
                     ptr=ptr,
