@@ -325,7 +325,7 @@ def main(parser):
                 val_ids, cfg.block_size, cfg.batch_size, device
             ):
                 with torch.autocast(
-                    device_type=device.type, dtype=torch.bfloat16, enabled=use_bf16
+                    device_type=device, dtype=torch.bfloat16, enabled=use_bf16
                 ):
                     logits, _ = model(xb, yb)
                 B, T, V = logits.size()
@@ -419,7 +419,7 @@ def main(parser):
 
             compute_start = time.perf_counter()
             with torch.autocast(
-                device_type=device.type, dtype=torch.bfloat16, enabled=use_bf16
+                device_type=device, dtype=torch.bfloat16, enabled=use_bf16
             ):
                 logits, loss = model(xb, yb)
 
