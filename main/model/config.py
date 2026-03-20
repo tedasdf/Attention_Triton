@@ -28,7 +28,7 @@ class Hyperparameters:
 
     mlp_type: str = "standard"
     is_RoPE: bool = False
-
+    use_xformers: bool = False
     # nb_features: int = 256
     # window_size: int = 32
     # d_compression: int = 128
@@ -58,6 +58,7 @@ class AttentionConfig:
     n_head: int
     block_size: int
     dropout: float
+    use_xformers: bool
 
 
 # @dataclass

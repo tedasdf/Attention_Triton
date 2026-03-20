@@ -1,20 +1,21 @@
 # model/attention/__init__.py
 from .standard import CausalSelfAttention
+
 # from .GQA import GroupQueryAttn
 # from .Performer import PerFormerAttention
 # from .LinFormer import LinFormerAttn
 # from .MLA import MultiLatentHeadAttn
 # from .sliding import SlidingWindowSelfAttention
-# from .flash_triton import FlashTritonAttention
+from .flash_triton import FlashTritonAttention
 
 ATTENTION_REGISTRY = {
     "standard": CausalSelfAttention,
+    "flash": FlashTritonAttention,
     # "sliding": SlidingWindowSelfAttention,
     # "performer": PerFormerAttention,
     # "gpa": GroupQueryAttn,
     # "linformer": LinFormerAttn,
     # "mla": MultiLatentHeadAttn,
-    # "flash": FlashTritonAttention,
     # "sliding": SlidingAttention
 }
 

@@ -13,14 +13,8 @@ command:
 parameters:
   config_path:
     values:
-      - configs/sweep/train/model_size/model_small.yaml
-      - configs/sweep/train/model_size/model_base.yaml
-      - configs/sweep/train/model_size/model_large.yaml
-
-  data_dir:
-    values:
-      - ./artifacts/datasets/hn_250k
-      - ./artifacts/datasets/hn_500k
-      - ./artifacts/datasets/hn_1M
-      - ./artifacts/datasets/hn_2M
-      - ./artifacts/datasets/hn_4M
+      - configs/sweep/train/scaling2/model5M.yaml
+      - configs/sweep/train/scaling2/model7M.yaml
+      - configs/sweep/train/scaling2/model9M.yaml
+      - configs/sweep/train/scaling2/model15M.yaml
+      - configs/sweep/train/scaling2/model22M.yaml

@@ -2,7 +2,7 @@
 hyperparameters:
   seed: 1337
   log_file: "./logs/mainrun.log"
-  data_dir: "./artifacts/datasets/refinedweb_Nexact22M"
+  data_dir: "./artifacts/datasets/refinedweb_Nexact7M"
   output_dir: "./artifacts/runs/train"
 
   # training param
@@ -20,13 +20,13 @@ hyperparameters:
 
   attn_type: "standard"
   block_size: 2048
-  n_layer: 8
+  n_layer: 4
+  d_model: 128
   n_head: 4
-  d_model: 288
   dropout: 0.0
   is_RoPE: True
   mlp_type: 'standard'
-  use_xformers: True
+  
   
   # d_compression: 128
   # nb_features: 256
