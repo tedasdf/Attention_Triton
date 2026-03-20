@@ -302,7 +302,7 @@ def main(parser):
     )
 
     use_bf16 = (
-        device.type == "cuda"
+        device == "cuda"
         and getattr(cfg, "use_bfloat16", False)
         and torch.cuda.is_bf16_supported()
     )
