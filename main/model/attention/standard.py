@@ -9,6 +9,7 @@ from model.RoPE import RotaryEmbedding
 try:
     import xformers.ops as xops
 
+    print("USING XFOPRMERS")
     HAS_XFORMERS = True
 except ImportError:
     xops = None

@@ -186,22 +186,22 @@ Is memory stable over time?
 
 
 
-
+verifying the network 
 1) imrpvoe the latency ( on to this : 1)  <----- 
-
-2) logged ion the time for each training stage already \
+<!-- 
+2) logged ion the time for each training stage already \ --> done
 
 3) increase parameter and show how that increase training
 
-4) opimise the training ( 1.5/ 2 days) -22
+4) opimise the training ( 1.5/ 2 days) -22 (finsih)
+used : xformer
+used: flash attention 
 
-5) have dataset ready gonna use olmo dataset (concurrent with 4)
 
-6) function for getting different training sizes I want (22 nogjt)
 
 [use only full attetnion ]
-7) saling law replicating the resolving discrepancies in computeoptimalk scaling in language model paper (3 days) 26
-
+7) saling law replicating the resolving discrepancies in computeoptimalk scaling in language model paper (3 days) 26 <------ >
+ can do this within one day mostly just training and reading graph should be fine
 
 8) have fiunction to map the cost of each sweep or each scaling law  ( with step 7)
 
