@@ -16,6 +16,7 @@ class Hyperparameters:
     warmup_step: int = 3000
     evals_per_epoch: int = 3
     accumulation_steps: int = 2
+    z_loss_weight: float = 1e-4
 
     attn_type: str = "standard"
     block_size: int = 128
