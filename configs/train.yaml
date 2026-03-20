@@ -12,18 +12,21 @@ hyperparameters:
   betas: [0.9, 0.95]
   batch_size: 256          # batch per processing
   accumulation_steps: 1   # num_minibatch = batch * accumulation_steps
-
+  # Kaplan adaptation
+  warmup_step: 3000
+  z_loss_weight: 1e-4
   
+  vocab_size: 50432
+
   attn_type: "standard"
   block_size: 2048
   n_layer: 8
   n_head: 4
   d_model: 288
-  dropout: 0.1
+  dropout: 0.0
+  is_RoPE: True
   mlp_type: 'standard'
   
-  # Kaplan adaptation
-  warmup_step: 3000
   
   # d_compression: 128
   # nb_features: 256
