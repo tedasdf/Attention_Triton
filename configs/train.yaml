@@ -2,24 +2,23 @@
 hyperparameters:
   seed: 1337
   log_file: "./logs/mainrun.log"
-  data_dir: "./artifacts/datasets/hn_1M"
+  data_dir: "./artifacts/datasets/refinedweb_Nexact22M"
   output_dir: "./artifacts/runs/train"
 
   # training param
-  epochs: 7
   lr: 0.003         # Scientific notation (6e-3) is also supported
-  weight_decay: 0.05
+  weight_decay: 1e-4
   evals_per_epoch: 3
-  betas: [0.99, 0.999]
-  batch_size: 64          # batch per processing
-  accumulation_steps: 4   # num_minibatch = batch * accumulation_steps
+  betas: [0.9, 0.95]
+  batch_size: 256          # batch per processing
+  accumulation_steps: 1   # num_minibatch = batch * accumulation_steps
 
   
   attn_type: "standard"
-  block_size: 64
-  n_layer: 6
-  n_head: 6
-  d_model: 384
+  block_size: 2048
+  n_layer: 8
+  n_head: 4
+  d_model: 288
   dropout: 0.1
   mlp_type: 'standard'
   

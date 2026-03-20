@@ -281,7 +281,7 @@ def main(parser):
         model.parameters(), lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.weight_decay
     )
 
-    warmup_steps = cfg.warmup
+    warmup_steps = cfg.warmup_step
     cosine_steps = max(1, max_steps - warmup_steps)
 
     scheduler_decay = torch.optim.lr_scheduler.CosineAnnealingLR(
