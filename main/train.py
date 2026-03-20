@@ -231,8 +231,17 @@ def main(parser):
 
     tok = BPETokenizer.load(tokenizer_path)
 
-    train_ids = torch.from_numpy(np.fromfile(train_path, dtype=np.int64)).long()
-    val_ids = torch.from_numpy(np.fromfile(val_path, dtype=np.int64)).long()
+    train_ids = torch.from_numpy(
+        np.fromfile(train_path, dtype=np.uint16).astype(np.int64)
+    ).long()
+
+    val_ids = torch.from_numpy(
+        np.fromfile(val_path, dtype=np.uint16).astype(np.int64)
+    ).long()
+
+    print("vocab size:", tok.vocab_size)
+    print("train min/max:", int(train_ids.min()), int(train_ids.max()))
+    print("val min/max:", int(val_ids.min()), int(val_ids.max()))
 
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
