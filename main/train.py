@@ -200,7 +200,7 @@ def main(parser):
     # Inside your main()
     if parser.smoke_test:
         print("🚀 SMOKE TEST MODE: Running 1 epoch, 1 batch only.")
-        cfg.epochs = 1
+        epochs = 1
         cfg.num_titles = 100
         batches = 1  # Force it to just one iteration
         print("⚠️ WANDB_API_KEY not found in environment. WandB might fail.")
@@ -255,15 +255,15 @@ def main(parser):
 
     target_train_tokens = 20 * model_params
     tokens_per_epoch = len(train_ids)
-    cfg.epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
-    max_steps = cfg.epochs * steps_per_epoch
+    epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
+    max_steps = epochs * steps_per_epoch
     eval_interval = max(1, batches // cfg.evals_per_epoch)
 
     logger.log(
         "dataset_info",
         train_tokens=len(train_ids),
         val_tokens=len(val_ids),
-        epochs=cfg.epochs,
+        epochs=epochs,
         batches_per_epoch=batches,
         vocab_size=tok.vocab_size,
     )
@@ -272,7 +272,7 @@ def main(parser):
         "training_budget",
         target_train_tokens=target_train_tokens,
         tokens_per_epoch=tokens_per_epoch,
-        computed_epochs=cfg.epochs,
+        computed_epochs=epochs,
     )
 
     logger.log("model_info", parameters_count=model_params)
@@ -405,8 +405,8 @@ def main(parser):
         ptr = state["ptr"]
         best_val_loss = state["best_val_loss"]
 
-    for epoch in range(start_epoch, cfg.epochs + 1):
-        for i in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{cfg.epochs}"):
+    for epoch in range(start_epoch, epochs + 1):
+        for i in tqdm(range(1, batches + 1), desc=f"Epoch {epoch}/{epochs}"):
             global_step += 1
 
             step_start = time.perf_counter()
