@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Hyperparameters:
+    seed: int = 1337
     log_file: str = "./logs/mainrun.log"
     data_dir: str = "./artifacts/datasets/hn_v1"
     output_dir: str = "./artifacts/runs/train"
