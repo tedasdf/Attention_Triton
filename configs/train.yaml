@@ -10,8 +10,8 @@ hyperparameters:
   weight_decay: 1e-4
   evals_per_epoch: 3
   betas: [0.9, 0.95]
-  batch_size: 256          # batch per processing
-  accumulation_steps: 1   # num_minibatch = batch * accumulation_steps
+  batch_size: 128          # batch per processing
+  accumulation_steps: 2   # num_minibatch = batch * accumulation_steps
   # Kaplan adaptation
   warmup_step: 3000
   z_loss_weight: 1e-4
