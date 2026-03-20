@@ -123,6 +123,42 @@ def iter_full_split(
         yield x, y
 
 
+def cross_entropy_with_z_loss(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    z_loss_weight: float = 1e-4,
+    ignore_index: int = -100,
+):
+    """
+    logits:  [B, T, V]
+    targets: [B, T]
+    """
+    B, T, V = logits.shape
+
+    flat_logits = logits.reshape(B * T, V)
+    flat_targets = targets.reshape(B * T)
+
+    ce_loss = F.cross_entropy(
+        flat_logits,
+        flat_targets,
+        ignore_index=ignore_index,
+    )
+
+    if z_loss_weight == 0.0:
+        return ce_loss, ce_loss.detach(), torch.tensor(0.0, device=logits.device)
+
+    log_z = torch.logsumexp(flat_logits, dim=-1)  # [B*T]
+    valid_mask = flat_targets != ignore_index
+
+    if valid_mask.any():
+        z_loss = (log_z[valid_mask] ** 2).mean()
+    else:
+        z_loss = torch.tensor(0.0, device=logits.device, dtype=logits.dtype)
+
+    total_loss = ce_loss + z_loss_weight * z_loss
+    return total_loss, ce_loss.detach(), z_loss.detach()
+
+
 def main(parser):
     if parser.sweep:
         wandb.init(project=parser.wandb_project)
@@ -198,17 +234,6 @@ def main(parser):
     train_ids = torch.from_numpy(np.fromfile(train_path, dtype=np.int64)).long()
     val_ids = torch.from_numpy(np.fromfile(val_path, dtype=np.int64)).long()
 
-    target_train_tokens = 8_000_000
-    tokens_per_epoch = len(train_ids)
-    cfg.epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
-
-    logger.log(
-        "training_budget",
-        target_train_tokens=target_train_tokens,
-        tokens_per_epoch=tokens_per_epoch,
-        computed_epochs=cfg.epochs,
-    )
-
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             dataset_metadata = json.load(f)
@@ -237,6 +262,17 @@ def main(parser):
     model_params = int(sum(p.numel() for p in model.parameters()))
     trainable_model_params = int(
         sum(p.numel() for p in model.parameters() if p.requires_grad)
+    )
+
+    target_train_tokens = 20 * model_params
+    tokens_per_epoch = len(train_ids)
+    cfg.epochs = max(1, math.ceil(target_train_tokens / tokens_per_epoch))
+
+    logger.log(
+        "training_budget",
+        target_train_tokens=target_train_tokens,
+        tokens_per_epoch=tokens_per_epoch,
+        computed_epochs=cfg.epochs,
     )
 
     logger.log("model_info", parameters_count=model_params)
@@ -335,6 +371,7 @@ def main(parser):
     optimizer_step = 0
     best_val_loss = float("inf")
     nonfinite_events_total = 0
+    z_loss_weight = cfg.z_loss_weight
     t0 = time.perf_counter()
 
     save_config_snapshot(parser.config_path, run_dir)
@@ -384,7 +421,14 @@ def main(parser):
             with torch.autocast(
                 device_type=device.type, dtype=torch.bfloat16, enabled=use_bf16
             ):
-                _, loss = model(xb, yb)
+                logits, loss = model(xb, yb)
+
+            loss, ce_loss, z_loss = cross_entropy_with_z_loss(
+                logits,
+                yb,
+                z_loss_weight=z_loss_weight,
+                ignore_index=-100,
+            )
             loss.backward()
 
             grad_norm = None

@@ -8,7 +8,6 @@ class Hyperparameters:
     output_dir: str = "./artifacts/runs/train"
 
     vocab_size: int = 50432
-    epochs: int = 7
     lr: float = 6e-3
     betas: tuple[float, float] = (0.99, 0.95)
 
