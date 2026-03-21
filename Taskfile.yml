@@ -35,7 +35,7 @@ tasks:
 
   sweep:create:
     cmds:
-      - wandb sweep {{.CONFIG_SWEEP}}
+      - wandb sweep -project scaling_law {{.CONFIG_SWEEP}}
   
   sweep:agent:*:
     vars:
