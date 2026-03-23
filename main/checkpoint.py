@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import json
-import shutil
 import torch
+from omegaconf import OmegaConf
 
 
 @dataclass
@@ -28,80 +28,106 @@ def create_run_dir(
 
     run_dir = output_root / run_name
     checkpoints_dir = run_dir / "checkpoints"
-    logs_dir = run_dir / "logs"
-    artifacts_dir = run_dir / "artifacts"
 
+    run_dir.mkdir(parents=True, exist_ok=True)
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     return {
         "run_dir": run_dir,
         "checkpoints_dir": checkpoints_dir,
-        "logs_dir": logs_dir,
-        "artifacts_dir": artifacts_dir,
     }
 
 
-def write_run_metadata(
-    run_dir: str | Path,
-    run_name: str,
-    data_dir: str | Path,
-    tokenizer_path: str | Path,
-    dataset_metadata_path: str | Path,
-    hyperparameters: dict[str, Any],
-    status: str = "running",
-    best_val_loss: float | None = None,
-    latest_step: int = 0,
-    latest_epoch: int = 0,
-) -> Path:
-    run_dir = Path(run_dir)
-    metadata_path = run_dir / "run_metadata.json"
-
-    metadata = {
-        "run_name": run_name,
-        "data_dir": str(data_dir),
-        "tokenizer_path": str(tokenizer_path),
-        "dataset_metadata_path": str(dataset_metadata_path),
-        "config_path": hyperparameters,
-        "best_val_loss": best_val_loss,
-        "latest_step": latest_step,
-        "latest_epoch": latest_epoch,
-        "status": status,
-    }
-
-    with metadata_path.open("w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
-
-    return metadata_path
-
-
-def update_run_metadata(
-    run_dir: str | Path,
-    **updates: Any,
-) -> None:
-    run_dir = Path(run_dir)
-    metadata_path = run_dir / "run_metadata.json"
-
-    if metadata_path.exists():
-        with metadata_path.open("r", encoding="utf-8") as f:
-            metadata = json.load(f)
-    else:
-        metadata = {}
-
-    metadata.update(updates)
-
-    with metadata_path.open("w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
-
-
-def save_config_snapshot(config_path: str | Path, run_dir: str | Path) -> Path:
-    config_path = Path(config_path)
-    run_dir = Path(run_dir)
-
+def write_config_snapshot(run_dir: Path, loaded_cfg, cfg, parser) -> None:
     snapshot_path = run_dir / "config_snapshot.yaml"
-    shutil.copy2(config_path, snapshot_path)
-    return snapshot_path
+
+    snapshot_payload = OmegaConf.create(
+        {
+            "source_config_path": str(getattr(parser, "config_path", "")),
+            "smoke_test": bool(getattr(parser, "smoke_test", False)),
+            "resume": bool(getattr(parser, "resume", False)),
+            "sweep": bool(getattr(parser, "sweep", False)),
+            "loaded_config": OmegaConf.to_container(loaded_cfg, resolve=True),
+            "resolved_hyperparameters": OmegaConf.to_container(cfg, resolve=True),
+        }
+    )
+
+    OmegaConf.save(config=snapshot_payload, f=snapshot_path)
+
+
+def write_run_info(
+    run_dir: Path,
+    output_root: Path,
+    status: str,
+    *,
+    config_path: str | None = None,
+    smoke_test: bool = False,
+    resume: bool = False,
+    sweep: bool = False,
+    data_dir: str | Path | None = None,
+    model_params: int | None = None,
+    trainable_model_params: int | None = None,
+    latest_epoch: int | None = None,
+    latest_step: int | None = None,
+    best_val_loss: float | None = None,
+    error: str | None = None,
+    wandb_info: dict[str, Any] | None = None,
+) -> None:
+    payload = {
+        "status": status,
+        "run_dir": str(run_dir),
+        "output_root": str(output_root),
+        "config_path": config_path,
+        "smoke_test": smoke_test,
+        "resume": resume,
+        "sweep": sweep,
+        "data_dir": str(data_dir) if data_dir is not None else None,
+        "model_params": model_params,
+        "trainable_model_params": trainable_model_params,
+        "latest_epoch": latest_epoch,
+        "latest_step": latest_step,
+        "best_val_loss": best_val_loss,
+        "error": error,
+        "wandb": wandb_info
+        or {
+            "enabled": False,
+            "project": None,
+            "entity": None,
+            "id": None,
+            "name": None,
+            "url": None,
+        },
+    }
+
+    with open(run_dir / "run_info.json", "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
+def append_run_registry(
+    output_root: Path,
+    run_dir: Path,
+    *,
+    config_path: str | None = None,
+    status: str,
+    wandb_info: dict[str, Any] | None = None,
+) -> None:
+    wandb_info = wandb_info or {}
+
+    row = {
+        "run_dir": str(run_dir),
+        "run_name": run_dir.name,
+        "config_path": config_path,
+        "status": status,
+        "wandb_project": wandb_info.get("project"),
+        "wandb_entity": wandb_info.get("entity"),
+        "wandb_id": wandb_info.get("id"),
+        "wandb_name": wandb_info.get("name"),
+        "wandb_url": wandb_info.get("url"),
+    }
+
+    registry_path = output_root / "run_registry.jsonl"
+    with open(registry_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(row) + "\n")
 
 
 def save_checkpoint(
@@ -113,10 +139,12 @@ def save_checkpoint(
     step: int,
     ptr: int,
     best_val_loss: float,
-    config: dict[str, Any],
-    data_dir: str | Path,
-    tokenizer_path: str | Path,
-) -> None:
+    *,
+    wandb_run=None,
+    artifact_name: str | None = None,
+    aliases: list[str] | None = None,
+    upload_to_wandb: bool = False,
+) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -130,12 +158,30 @@ def save_checkpoint(
         "step": step,
         "ptr": ptr,
         "best_val_loss": best_val_loss,
-        "config": config,
-        "data_dir": str(data_dir),
-        "tokenizer_path": str(tokenizer_path),
     }
 
     torch.save(checkpoint, path)
+
+    if upload_to_wandb:
+        if wandb_run is None:
+            raise ValueError("upload_to_wandb=True but wandb_run is None")
+
+        import wandb
+
+        artifact = wandb.Artifact(
+            name=artifact_name or f"{wandb_run.id}-checkpoint",
+            type="model",
+            metadata={
+                "epoch": epoch,
+                "step": step,
+                "best_val_loss": best_val_loss,
+                "local_path": str(path),
+            },
+        )
+        artifact.add_file(str(path), name=path.name)
+        wandb_run.log_artifact(artifact, aliases=aliases or ["latest"])
+
+    return path
 
 
 def load_checkpoint(
@@ -161,119 +207,4 @@ def load_checkpoint(
         "step": checkpoint.get("step", 0),
         "ptr": checkpoint.get("ptr", 0),
         "best_val_loss": checkpoint.get("best_val_loss", float("inf")),
-        "config": checkpoint.get("config", {}),
-        "data_dir": checkpoint.get("data_dir"),
-        "tokenizer_path": checkpoint.get("tokenizer_path"),
     }
-
-
-def maybe_save_step_checkpoint(
-    ckpt_cfg: CheckpointConfig,
-    checkpoints_dir: str | Path,
-    model,
-    opt,
-    scheduler,
-    epoch: int,
-    step: int,
-    ptr: int,
-    best_val_loss: float,
-    config: dict[str, Any],
-    data_dir: str | Path,
-    tokenizer_path: str | Path,
-) -> None:
-    if not ckpt_cfg.save_step_checkpoints:
-        return
-    if step % ckpt_cfg.step_checkpoint_interval != 0:
-        return
-
-    checkpoints_dir = Path(checkpoints_dir)
-    step_path = checkpoints_dir / f"step_{step:07d}.pt"
-
-    save_checkpoint(
-        path=step_path,
-        model=model,
-        opt=opt,
-        scheduler=scheduler,
-        epoch=epoch,
-        step=step,
-        ptr=ptr,
-        best_val_loss=best_val_loss,
-        config=config,
-        data_dir=data_dir,
-        tokenizer_path=tokenizer_path,
-    )
-
-    step_ckpts = sorted(checkpoints_dir.glob("step_*.pt"))
-    if len(step_ckpts) > ckpt_cfg.keep_last_n_step_checkpoints:
-        for old_ckpt in step_ckpts[: -ckpt_cfg.keep_last_n_step_checkpoints]:
-            old_ckpt.unlink(missing_ok=True)
-
-
-def save_latest_checkpoint(
-    ckpt_cfg: CheckpointConfig,
-    checkpoints_dir: str | Path,
-    model,
-    opt,
-    scheduler,
-    epoch: int,
-    step: int,
-    ptr: int,
-    best_val_loss: float,
-    config: dict[str, Any],
-    data_dir: str | Path,
-    tokenizer_path: str | Path,
-) -> None:
-    if not ckpt_cfg.save_latest:
-        return
-
-    checkpoints_dir = Path(checkpoints_dir)
-    latest_path = checkpoints_dir / "latest.pt"
-
-    save_checkpoint(
-        path=latest_path,
-        model=model,
-        opt=opt,
-        scheduler=scheduler,
-        epoch=epoch,
-        step=step,
-        ptr=ptr,
-        best_val_loss=best_val_loss,
-        config=config,
-        data_dir=data_dir,
-        tokenizer_path=tokenizer_path,
-    )
-
-
-def save_best_checkpoint(
-    ckpt_cfg: CheckpointConfig,
-    checkpoints_dir: str | Path,
-    model,
-    opt,
-    scheduler,
-    epoch: int,
-    step: int,
-    ptr: int,
-    best_val_loss: float,
-    config: dict[str, Any],
-    data_dir: str | Path,
-    tokenizer_path: str | Path,
-) -> None:
-    if not ckpt_cfg.save_best:
-        return
-
-    checkpoints_dir = Path(checkpoints_dir)
-    best_path = checkpoints_dir / "best.pt"
-
-    save_checkpoint(
-        path=best_path,
-        model=model,
-        opt=opt,
-        scheduler=scheduler,
-        epoch=epoch,
-        step=step,
-        ptr=ptr,
-        best_val_loss=best_val_loss,
-        config=config,
-        data_dir=data_dir,
-        tokenizer_path=tokenizer_path,
-    )
