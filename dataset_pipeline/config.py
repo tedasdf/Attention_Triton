@@ -2,11 +2,11 @@ import yaml
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from .stages.snapshot import DedupConfig
-from .stages.cluster import ClusterConfig
-from .stages.canonicalize import CanonicalizerConfig
-from .stages.minihash import MinHashConfig
-from .stages.pairs import LSHConfig
+from stages.snapshot import DedupConfig
+from stages.cluster import ClusterConfig
+from stages.canonicalize import CanonicalizerConfig
+from stages.minihash import MinHashConfig
+from stages.pairs import LSHConfig
 # from stages.snapshot import DedupConfig
 
 
